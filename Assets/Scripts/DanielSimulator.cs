@@ -96,11 +96,19 @@ public class DanielSimulator : MonoBehaviour
     Texture2D editCursor;
     bool practiceSettingsOpen = true, practiceBossUltimate;
     float skillAmplification, daggerWindow, daggerCooldown;
-    static readonly string[] SkillKeys = { "Q", "W", "E", "R", "P", "D" };
-    static readonly string[] SkillNames = { "그림자 가위", "영감 표식", "그림자 이동", "걸작", "고독한 예술가", "망토와 단검" };
+    int tacticalLevel = 1;
+    float tacticalCooldown, tacticalCooldownDuration, tacticalHasteTime, tacticalHaste;
+    const float TacticalRange = 2.5f, TacticalHasteDuration = 2.5f, TacticalBaseHaste = .20f;
+    static readonly float[] TacticalHastePerTarget = { .05f, .10f };
+    static readonly float[] TacticalMaxHaste = { .30f, .40f };
+    static readonly float[] TacticalCooldown = { 9f, 7f };
+    float TacticalDamage => 140f + danielLevel * 20f;
+    float TacticalModuleDamage => 50f + danielLevel * 10f;
+    static readonly string[] SkillKeys = { "Q", "W", "E", "R", "P", "D", "F" };
+    static readonly string[] SkillNames = { "그림자 가위", "영감 표식", "그림자 이동", "걸작", "고독한 예술가", "망토와 단검", "진실의 칼날" };
     readonly Texture2D[] skillIcons = new Texture2D[SkillKeys.Length];
     Texture2D cooldownSweep, danielPortrait, hudStats;
-    const int PassiveSlot = 4, WeaponSlot = 5;
+    const int PassiveSlot = 4, WeaponSlot = 5, TacticalSlot = 6;
     const float SkillSlotX = 425f, SkillSlotY = 607f, SkillSlotSize = 42f, SkillSlotSpacing = 56f;
     const float HudScale = .82f;
     static readonly Rect CombatHud = new Rect(66, 600, 1148, 119);
@@ -336,6 +344,7 @@ public class DanielSimulator : MonoBehaviour
         foreach(var effect in FindObjectsByType<DanielSkillVfx>(FindObjectsSortMode.None)) Destroy(effect.gameObject);
         mode=next; ended=false; won=false; health=PlayerMaxHealth; stealth=0; shadowBuff=0; invulnerable=0; elapsed=0; hits=0; dodged=0; kills=0; stealthUses=0; attackTimer=0; ultimateTime=0; ultimateWindup=0; ultimateExitTime=0; stealthTint=0; qDelay=0; qBuffTime=0; qBuffAttacks=0; dashTime=0; nextUltimateTick=0; if(qEffect) Destroy(qEffect); attackTarget=null; ultimateTarget=null;
         daggerWindow = daggerCooldown = 0;
+        tacticalCooldown = tacticalHasteTime = 0f;
         for(int i=0;i<4;i++) cooldown[i]=0;
         foreach(var e in enemies) { if(e.body) Destroy(e.body); if(e.warning) Destroy(e.warning); } enemies.Clear();
         foreach(var s in shots) if(s.body) Destroy(s.body); shots.Clear();
@@ -575,6 +584,8 @@ public class DanielSimulator : MonoBehaviour
         if(dashTime>0) { afterimageTimer-=dt; if(afterimageTimer<=0 && characterAnimation) { DanielSkillVfx.Afterimage(characterAnimation.transform,.3f); afterimageTimer=.045f; } dashTime=Mathf.Max(0,dashTime-dt); { float dashK=1-dashTime/DashTravel; player.transform.position=Vector3.Lerp(dashFrom,dashTo,1-(1-dashK)*(1-dashK)); } destination=player.transform.position; }
         daggerWindow = Mathf.Max(0, daggerWindow - dt);
         daggerCooldown = Mathf.Max(0, daggerCooldown - dt);
+        tacticalCooldown = Mathf.Max(0f, tacticalCooldown - dt);
+        tacticalHasteTime = Mathf.Max(0f, tacticalHasteTime - dt);
         if(!IsUntargetable && Mouse.current!=null && Mouse.current.rightButton.wasPressedThisFrame) {
             Enemy clicked=EnemyAtCursor();
             if(clicked!=null) { attackTarget=clicked; DanielSkillVfx.ClickMarker(clicked.body.transform.position,true); Show("표적을 추격하고 기본 공격합니다."); }
@@ -627,6 +638,7 @@ public class DanielSimulator : MonoBehaviour
             }
             if(Keyboard.current.qKey.wasPressedThisFrame) Cast(0); if(Keyboard.current.wKey.wasPressedThisFrame) Cast(1); if(Keyboard.current.eKey.wasPressedThisFrame) Cast(2); if(Keyboard.current.rKey.wasPressedThisFrame) Cast(3);
             if(Keyboard.current.dKey.wasPressedThisFrame) CastDagger();
+            if (Keyboard.current.fKey.wasPressedThisFrame) CastTacticalSkill();
             if (Keyboard.current.escapeKey.wasPressedThisFrame && targetEdit != TargetEdit.None) SetTargetEdit(TargetEdit.None);
         }
         // Stealth presentation: smoke veil while hidden, a reveal ring when it ends on its own or is broken by a skill.
@@ -918,6 +930,33 @@ public class DanielSimulator : MonoBehaviour
         castFacingTime=0;
         if(characterAnimation) characterAnimation.CancelUltimateExit();
     }
+    void CastTacticalSkill()
+    {
+        if (ultimateWindup > 0f || ultimateTime > 0f || tacticalCooldown > 0f) return;
+
+        CancelUltimateExit();
+        stealth = 0f;
+        int rank = tacticalLevel - 1;
+        tacticalCooldown = tacticalCooldownDuration = TacticalCooldown[rank];
+        tacticalHasteTime = TacticalHasteDuration;
+
+        Vector3 origin = player.transform.position;
+        bool upgraded = tacticalLevel == 2;
+        float damage = TacticalDamage;
+        float moduleDamage = upgraded ? TacticalModuleDamage : 0f;
+        int targetsHit = 0;
+        DanielSkillVfx.TruthBlades(origin, player.transform.forward, TacticalRange, upgraded);
+        foreach (var enemy in enemies)
+        {
+            if (enemy.dead || (enemy.body.transform.position - origin).sqrMagnitude > TacticalRange * TacticalRange) continue;
+            Hurt(enemy, damage, extraSkillDamage: moduleDamage);
+            targetsHit++;
+        }
+
+        tacticalHaste = Mathf.Min(TacticalMaxHaste[rank],
+            TacticalBaseHaste + Mathf.Max(0, targetsHit - 1) * TacticalHastePerTarget[rank]);
+    }
+
     void CastDagger()
     {
         if (ultimateWindup > 0 || ultimateTime > 0 || dashTime > 0) return;
@@ -1150,6 +1189,7 @@ public class DanielSimulator : MonoBehaviour
     {
         float speed = 3.55f;
         if (daggerWindow > DaggerRecastDuration - DaggerHasteDuration) speed *= 1f + DaggerHaste[daggerRank];
+        if (tacticalHasteTime > 0f) speed *= 1f + tacticalHaste;
         if (IsNight) speed *= 1f + PassiveSpeed[passiveLevel - 1];
         if (IsInFire(player.transform.position)) speed *= .7f;
         return speed;
@@ -1204,7 +1244,6 @@ public class DanielSimulator : MonoBehaviour
         if (fill.width > 0f) Box(fill, new Color(.52f, .78f, .20f, .98f));
         GUI.Label(healthFrame, $"{FormatDamage(health)} / {FormatDamage(PlayerMaxHealth)}", skillKeyStyle);
 
-        DrawHudSlot(new Rect(SkillSlotPosition(6), SkillSlotY, SkillSlotSize, SkillSlotSize), "F");
         DrawHudSlot(new Rect(706, 676, 97, 28), "◇  —");
         DrawHudSlot(new Rect(815, 608, 30, 48), "B");
         DrawHudSlot(new Rect(815, 663, 30, 42), "V");
@@ -1356,7 +1395,7 @@ public class DanielSimulator : MonoBehaviour
         for (int i = 0; i < SkillKeys.Length; i++)
         {
             float active = 0, activeDuration = 1;
-            float remaining = i == WeaponSlot ? daggerCooldown : i < cooldown.Length ? cooldown[i] : 0f;
+            float remaining = i == TacticalSlot ? tacticalCooldown : i == WeaponSlot ? daggerCooldown : i < cooldown.Length ? cooldown[i] : 0f;
             float cooldownDuration;
             switch (i)
             {
@@ -1365,6 +1404,7 @@ public class DanielSimulator : MonoBehaviour
                 case 2: cooldownDuration = shadowCooldown; active = shadowBuff; activeDuration = ShadowDuration; break;
                 case 3: cooldownDuration = activeUltimateCooldown; active = ultimateTime; activeDuration = UltimateHoldDuration; break;
                 case PassiveSlot: cooldownDuration = 0f; break;
+                case TacticalSlot: cooldownDuration = tacticalCooldownDuration; break;
                 default: cooldownDuration = DaggerCooldown[daggerRank]; active = daggerWindow; activeDuration = DaggerRecastDuration; break;
             }
 
@@ -1384,7 +1424,7 @@ public class DanielSimulator : MonoBehaviour
             float shownTime = active > 0 ? active : remaining;
             if (!locked && showTimer && shownTime > 0)
             {
-                DrawCooldownSweep(rect, shownTime / Mathf.Max(.01f, active > 0 ? activeDuration : PracticeCooldown(cooldownDuration)),
+                DrawCooldownSweep(rect, shownTime / Mathf.Max(.01f, active > 0 ? activeDuration : i == TacticalSlot ? cooldownDuration : PracticeCooldown(cooldownDuration)),
                     active > 0 ? new Color(.02f, .25f, .34f, .60f) : new Color(.015f, .02f, .04f, .77f));
                 string time = shownTime >= 1 ? Mathf.CeilToInt(shownTime).ToString() : shownTime.ToString("0.0");
                 GUI.Label(new Rect(rect.x + 1, rect.y - 1, rect.width, rect.height), time, skillTimerShadow);
@@ -1408,6 +1448,7 @@ public class DanielSimulator : MonoBehaviour
             case 2: rank = eLevel; maximum = EDamage.Length; break;
             case 3: rank = rLevel; maximum = RTickDamage.Length; break;
             case PassiveSlot: rank = passiveLevel; maximum = PassiveSight.Length; break;
+            case TacticalSlot: rank = tacticalLevel; maximum = TacticalCooldown.Length; break;
             default: rank = weaponMastery / 5; maximum = DaggerDamage.Length; break;
         }
 
@@ -1457,6 +1498,13 @@ public class DanielSimulator : MonoBehaviour
                 details = $"밤에 시야와 이동 속도가 증가합니다.\n시야 +{PassiveSight[passive]:P0} · 이동 속도 +{PassiveSpeed[passive]:P0}";
                 ranks = "레벨별 시야 +14% / +17% / +20%\n이동 속도 +2% / +4% / +6%";
                 break;
+            case TacticalSlot:
+                int tacticalRank = tacticalLevel - 1;
+                details = $"주변 {TacticalRange:0.#}m에 피해를 주고 {TacticalHasteDuration:0.#}초간 이동 속도가 {TacticalBaseHaste:P0} 증가합니다.\n피해 {TacticalDamage:0.#} · 캐릭터 레벨 × 20\n추가 대상당 +{TacticalHastePerTarget[tacticalRank]:P0} · 최대 {TacticalMaxHaste[tacticalRank]:P0} · 고정 쿨다운 {TacticalCooldown[tacticalRank]:0}초";
+                if (tacticalLevel == 2)
+                    details += $"\n모듈 추가 피해 {TacticalModuleDamage:0.#} · 캐릭터 레벨 × 10";
+                ranks = "기본 피해 140 · 모듈 기본 추가 피해 50";
+                break;
             default:
                 int rank = daggerWindow > 0 ? daggerRank : Mathf.Max(0, weaponMastery / 5 - 1);
                 float damage = DaggerDamage[rank] + .5f * BonusAttackPower + .25f * skillAmplification;
@@ -1489,7 +1537,7 @@ public class DanielSimulator : MonoBehaviour
     }
 
     static readonly string[] PracticeTabs = { "다니엘", "일반 적", "보스" };
-    Rect PracticePanelRect => new Rect(960, 182, 290, practiceSettingsOpen ? (practiceTab == 1 ? 385 : practiceTab == 0 ? 358 : 320) : 38);
+    Rect PracticePanelRect => new Rect(960, 182, 290, practiceSettingsOpen ? (practiceTab == 1 ? 385 : practiceTab == 0 ? 383 : 320) : 38);
 
     void DrawPracticeSettings()
     {
@@ -1529,6 +1577,7 @@ public class DanielSimulator : MonoBehaviour
             danielLevel = DrawPracticeValue("다니엘 레벨", danielLevel, 357, 1, 1, 20);
             if (PlayerMaxHealth != previousMaxHealth)
                 health = Mathf.Clamp(health / previousMaxHealth * PlayerMaxHealth, 1f, PlayerMaxHealth);
+            tacticalLevel = DrawPracticeValue("전술스킬 레벨", tacticalLevel, 535, 1, 1, TacticalCooldown.Length);
             return;
         }
 

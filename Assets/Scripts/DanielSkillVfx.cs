@@ -517,6 +517,22 @@ public sealed class DanielSkillVfx : MonoBehaviour
         return fx;
     }
 
+    public static void TruthBlades(Vector3 position, Vector3 direction, float radius, bool upgraded)
+    {
+        var fx = New(Kind.Slash, position + Vector3.up * .18f, direction, .40f);
+        fx.extraColor = new Color(.10f, .72f, 1f, .88f);
+        fx.extra = fx.MakeMaterial(fx.extraColor);
+        fx.Circle("Truth blade radius", Vector3.zero, radius, .045f, fx.extra, fx.transform, false);
+        fx.Arc("Truth blade", radius * .92f, 155f, .17f, fx.extra, fx.transform);
+        if (upgraded)
+        {
+            var second = new GameObject("Module blade").transform;
+            second.SetParent(fx.transform, false);
+            second.localRotation = Quaternion.Euler(0, 180f, 0);
+            fx.Arc("Module blade edge", radius * .86f, 150f, .14f, fx.extra, second);
+        }
+    }
+
     public static DanielSkillVfx AttackSlash(Vector3 position, Vector3 direction, bool empowered = false)
     {
         var fx=New(Kind.Slash,position+Vector3.up*.9f,direction,empowered?.32f:.24f);
