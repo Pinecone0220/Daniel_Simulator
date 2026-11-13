@@ -21,7 +21,7 @@ public class DanielSimulator : MonoBehaviour
         public readonly List<GameObject> outline = new List<GameObject>(); public bool outlined;
         public Vector3 direction;
         public float daggerSlowTime, daggerSlowFactor;
-        public float lastDamage, totalDamage, firstDamageTime, lastDamageTime;
+        public float lastDamage, totalDamage, streakDamage, firstDamageTime, lastDamageTime;
         public float hp = 160, timer, windup = -1, slow, slowFactor=1, markSlow, mark, storedDamage, recentDamage, visionDebuff, silence;
         public DanielSkillVfx ultimateLink;
         public bool dead, boss;
@@ -552,8 +552,12 @@ public class DanielSimulator : MonoBehaviour
 
     void UpdateEnemy(Enemy e,float dt) {
         if(e.dead) return;
-        if (IsPracticeDummy(e) && e.hp < e.maxHp && Time.time - e.lastDamageTime >= DummyHealDelay)
+        if (IsPracticeDummy(e) && Time.time - e.lastDamageTime >= DummyHealDelay)
+        {
             e.hp = e.maxHp;
+            e.lastDamage = 0f;
+            e.streakDamage = 0f;
+        }
         Vector3 face = player.transform.position - e.body.transform.position;
         face.y = 0;
         var settings = mode == Mode.Free ? (e.boss ? practiceBoss : practiceTarget) : null;
@@ -633,10 +637,11 @@ public class DanielSimulator : MonoBehaviour
             e.hp = Mathf.Max(1f, e.hp);
             if (damage > 0f)
             {
-                if (e.totalDamage == 0f) e.firstDamageTime = Time.time;
+                if (e.streakDamage == 0f) e.firstDamageTime = Time.time;
                 e.lastDamageTime = Time.time;
                 e.lastDamage = damage;
                 e.totalDamage += damage;
+                e.streakDamage += damage;
             }
         }
         ShowDamage(position, basicDamage, DamageType.Basic);
@@ -960,7 +965,7 @@ public class DanielSimulator : MonoBehaviour
             if (screen.z <= 0f) continue;
 
             float duration = Mathf.Max(1f, enemy.lastDamageTime - enemy.firstDamageTime);
-            float dps = enemy.totalDamage / duration;
+            float dps = enemy.streakDamage / duration;
             var rect = new Rect(screen.x / sx - 118f, (Screen.height - screen.y) / sy + 12f, 236f, 25f);
             Box(rect, new Color(.025f, .045f, .055f, .91f));
             GUI.Label(rect, $"직전 {FormatDamage(enemy.lastDamage)}  ·  총합 {FormatDamage(enemy.totalDamage)}  ·  DPS {FormatDamage(dps)}", dummyStatsStyle);
