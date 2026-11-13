@@ -395,12 +395,14 @@ public class DanielSimulator : MonoBehaviour
         float dt=Time.deltaTime; elapsed+=dt;
         foreach (var e in enemies) if (!e.dead) AdvanceMark(e, dt);
         stealthTint=Mathf.MoveTowards(stealthTint,stealth>0?1:0,dt*(stealth>0?6:4)); castFacingTime=Mathf.Max(0,castFacingTime-dt);
+        for(int i=0;i<4;i++) cooldown[i]=Mathf.Max(0,cooldown[i]-dt);
         stealth=Mathf.Max(0,stealth-dt); if(shadowBuff>0) { shadowBuff-=dt; if(shadowBuff<=0) { shadowBuff=0; cooldown[2]=PracticeCooldown(shadowCooldown); } }
         if (ultimateExitTime > 0)
         {
             ultimateExitTime = Mathf.Max(0, ultimateExitTime - dt);
             float progress = Mathf.Clamp01(1f - ultimateExitTime / DanielCharacterAnimation.UltimateExitDuration);
             player.transform.position = Vector3.Lerp(ultimateExitFrom, ultimateExitTo, Mathf.SmoothStep(0, 1, progress));
+            if (ultimateExitTime <= 0f) StartUltimateCooldown();
             destination = player.transform.position;
         }
         invulnerable=Mathf.Max(0,invulnerable-dt); qBuffTime=Mathf.Max(0,qBuffTime-dt); if(qBuffTime<=0) qBuffAttacks=0;
@@ -408,7 +410,6 @@ public class DanielSimulator : MonoBehaviour
         if(dashTime>0) { afterimageTimer-=dt; if(afterimageTimer<=0 && characterAnimation) { DanielSkillVfx.Afterimage(characterAnimation.transform,.3f); afterimageTimer=.045f; } dashTime=Mathf.Max(0,dashTime-dt); { float dashK=1-dashTime/DashTravel; player.transform.position=Vector3.Lerp(dashFrom,dashTo,1-(1-dashK)*(1-dashK)); } destination=player.transform.position; }
         daggerWindow = Mathf.Max(0, daggerWindow - dt);
         daggerCooldown = Mathf.Max(0, daggerCooldown - dt);
-        for(int i=0;i<4;i++) cooldown[i]=Mathf.Max(0,cooldown[i]-dt);
         if(!IsUntargetable && Mouse.current!=null && Mouse.current.rightButton.wasPressedThisFrame) {
             Enemy clicked=EnemyAtCursor();
             if(clicked!=null) { attackTarget=clicked; DanielSkillVfx.ClickMarker(clicked.body.transform.position,true); Show("표적을 추격하고 기본 공격합니다."); }
@@ -473,7 +474,7 @@ public class DanielSimulator : MonoBehaviour
         if(rangeVfx) { bool inside=false; foreach(var e in enemies) if(!e.dead && CanSeeEnemy(e) && Vector3.Distance(e.body.transform.position,player.transform.position)<=ShadowRange) inside=true; rangeVfx.SetRangeHighlight(inside); }
         // R window: chevrons point at every target damaged in the last 4 s; dark out of range, bright inside it.
         foreach(var e in enemies) {
-            bool link=IsUltimateTarget(e) && CanSeeEnemy(e) && cooldown[3]<=0 && ultimateTime<=0 && ultimateWindup<=0;
+            bool link=IsUltimateTarget(e) && CanSeeEnemy(e) && cooldown[3]<=0 && !IsUntargetable;
             if(link && !e.ultimateLink) e.ultimateLink=DanielSkillVfx.CreateUltimateLink(player.transform,e.body.transform);
             else if(!link && e.ultimateLink) { e.ultimateLink.Stop(); e.ultimateLink=null; }
             if(e.ultimateLink) e.ultimateLink.SetRangeHighlight(Vector3.Distance(e.body.transform.position,player.transform.position)<=UltimateRange);
@@ -742,9 +743,12 @@ public class DanielSimulator : MonoBehaviour
         if(characterAnimation) characterAnimation.PlayUltimateExit();
         ultimateTarget=null; ultimateTime=0; Show("걸작 종료!");
     }
+    void StartUltimateCooldown() => cooldown[3] = PracticeCooldown(activeUltimateCooldown);
+
     void CancelUltimateExit() {
         if(ultimateExitTime<=0) return;
         ultimateExitTime=0;
+        StartUltimateCooldown();
         castFacingTime=0;
         if(characterAnimation) characterAnimation.CancelUltimateExit();
     }
@@ -792,6 +796,7 @@ public class DanielSimulator : MonoBehaviour
     void Cast(int index) {
         if(ultimateWindup>0) return;
         if(ultimateTime>0) { if(index==3) ExitUltimate(); return; }
+        if(index==3 && ultimateExitTime>0) return;
         if(index==1) { foreach(var e in enemies) if(e.mark>0) { Show("영감 표식이 사라진 뒤 다시 사용할 수 있습니다."); return; } }
         if(index==2 && (shadowBuff>0 || dashTime>0)) { Show("그림자 이동이 아직 지속 중입니다."); return; }
         if(cooldown[index]>0) { Show("아직 스킬을 사용할 수 없습니다."); return; }
@@ -836,7 +841,7 @@ public class DanielSimulator : MonoBehaviour
         player.transform.rotation=Quaternion.LookRotation(aim);
         ultimateTickDamage = UltimateTickDamage;
         ultimateExitDamage = UltimateExitDamage;
-        activeUltimateCooldown = RCooldown[rLevel - 1]; cooldown[3]=PracticeCooldown(activeUltimateCooldown); attackTarget=null; stealth=0; ultimateTarget=targetR; ultimateWindup=UltimateWindupDuration; latchFrom=player.transform.position;
+        activeUltimateCooldown = RCooldown[rLevel - 1]; attackTarget=null; stealth=0; ultimateTarget=targetR; ultimateWindup=UltimateWindupDuration; latchFrom=player.transform.position;
         if(characterAnimation) characterAnimation.PlayUltimateLatch();
         DanielSkillVfx.Latch(player.transform,UltimateWindupDuration);
         skillAudio.Play(DanielSkillAudio.Cue.R_Latch);
@@ -1055,7 +1060,7 @@ public class DanielSimulator : MonoBehaviour
                 case 0: cooldownDuration = QCooldown[Mathf.Max(0, qCastLevel - 1)]; break;
                 case 1: cooldownDuration = WCooldown; active = markTime; activeDuration = WChargeTime + WReadyTime; break;
                 case 2: cooldownDuration = shadowCooldown; active = shadowBuff; activeDuration = ShadowDuration; break;
-                case 3: cooldownDuration = activeUltimateCooldown; active = ultimateTime; activeDuration = UltimateHoldDuration; break;
+                case 3: cooldownDuration = activeUltimateCooldown; active = ultimateWindup + ultimateTime + ultimateExitTime; break;
                 default: cooldownDuration = DaggerCooldown[daggerRank]; active = daggerWindow; activeDuration = DaggerRecastDuration; break;
             }
 
@@ -1069,14 +1074,16 @@ public class DanielSimulator : MonoBehaviour
             if (skillIcons[i]) GUI.DrawTexture(rect, skillIcons[i]);
             if (locked) Box(rect, new Color(.02f, .03f, .06f, .7f));
 
+            bool inUse = active > 0 && i >= 1 && i <= 3;
             float shownTime = active > 0 ? active : remaining;
             if (!locked && shownTime > 0)
             {
-                DrawCooldownSweep(rect, shownTime / Mathf.Max(.01f, active > 0 ? activeDuration : PracticeCooldown(cooldownDuration)),
+                if (inUse) Box(rect, new Color(.02f, .25f, .34f, .53f));
+                else DrawCooldownSweep(rect, shownTime / Mathf.Max(.01f, active > 0 ? activeDuration : PracticeCooldown(cooldownDuration)),
                     active > 0 ? new Color(.02f, .25f, .34f, .60f) : new Color(.015f, .02f, .04f, .77f));
-                string time = shownTime >= 1 ? Mathf.CeilToInt(shownTime).ToString() : shownTime.ToString("0.0");
-                GUI.Label(new Rect(rect.x + 1, rect.y - 1, rect.width, rect.height), time, skillTimerShadow);
-                GUI.Label(new Rect(rect.x, rect.y - 2, rect.width, rect.height), time, skillTimerStyle);
+                string time = inUse ? "사용 중" : shownTime >= 1 ? Mathf.CeilToInt(shownTime).ToString() : shownTime.ToString("0.0");
+                GUI.Label(new Rect(rect.x + 1, rect.y - 1, rect.width, rect.height), time, inUse ? skillKeyStyle : skillTimerShadow);
+                if (!inUse) GUI.Label(new Rect(rect.x, rect.y - 2, rect.width, rect.height), time, skillTimerStyle);
             }
             var key = new Rect(rect.xMax - 21, rect.yMax - 20, 19, 18);
             Box(key, new Color(.02f, .03f, .05f, .92f));
