@@ -122,10 +122,11 @@ public class DanielSimulator : MonoBehaviour
     static readonly float[] RCooldown = { 70, 60, 50 };
     static readonly float QFanSlope = Mathf.Tan(QHalfAngle * Mathf.Deg2Rad);
     float AttackSpeedMultiplier => qBuffAttacks > 0 ? 1f + qAttackSpeedBonus : 1f;
-    const float UltimateWindupDuration = .5f, UltimateHoldDuration = 2f;
+    const float UltimateWindupDuration = DanielSkillAudio.UltimateEnterOffset;
+    const float UltimateHoldDuration = DanielSkillAudio.UltimateExitOffset - UltimateWindupDuration;
     const float FighterModelScale = .9f;
-    // Tick rhythm measured from when Daniel attaches to the target.
-    static readonly float[] UltimateTickTimes = { .885f, 1.225f, 1.585f, 1.930f };
+    // Impact offsets from the start of R_Full.wav.
+    static readonly float[] UltimateTickTimes = { .76f, 1.14f, 1.52f, 1.90f };
     MaterialPropertyBlock markerColor;
     Material outlineMaterial;
     Color ink = new Color(.82f,.87f,.91f), muted = new Color(.55f,.63f,.68f), mint = new Color(.45f,.9f,.76f), red = new Color(1f,.38f,.38f);
@@ -435,7 +436,6 @@ public class DanielSimulator : MonoBehaviour
                     ultimateTarget.windup = -1;
                     ultimateTarget.warning.SetActive(false);
                 }
-                skillAudio.Play(DanielSkillAudio.Cue.R_Enter);
                 if(characterAnimation) characterAnimation.SetHidden(true);
                 DanielSkillVfx.SmokeBurst(latchFrom,toward); DanielSkillVfx.DashTrail(latchFrom,targetPos); DanielSkillVfx.SmokeStream(latchFrom,ultimateTarget.body.transform);
                 player.transform.position=targetPos; destination=targetPos;
@@ -464,7 +464,7 @@ public class DanielSimulator : MonoBehaviour
             }
             if(Keyboard.current.qKey.wasPressedThisFrame) Cast(0); if(Keyboard.current.wKey.wasPressedThisFrame) Cast(1); if(Keyboard.current.eKey.wasPressedThisFrame) Cast(2); if(Keyboard.current.rKey.wasPressedThisFrame) Cast(3);
             if(Keyboard.current.dKey.wasPressedThisFrame) CastDagger();
-            if(Keyboard.current.escapeKey.wasPressedThisFrame) { if (targetEdit != TargetEdit.None) SetTargetEdit(TargetEdit.None); else { ResetGame(Mode.Menu); return; } }
+            if (Keyboard.current.escapeKey.wasPressedThisFrame && targetEdit != TargetEdit.None) SetTargetEdit(TargetEdit.None);
         }
         // Stealth presentation: smoke veil while hidden, a reveal ring when it ends on its own or is broken by a skill.
         if(stealth>0 && dashTime<=0 && !veilVfx) { veilVfx=DanielSkillVfx.CreateVeil(player.transform); quietReveal=false; }
@@ -715,12 +715,11 @@ public class DanielSimulator : MonoBehaviour
         if (ultimateTarget != null)
         {
             player.transform.position = ultimateTarget.body.transform.position;
-            float holdElapsed = UltimateHoldDuration - ultimateTime;
+            float castElapsed = DanielSkillAudio.UltimateExitOffset - ultimateTime;
             // The cast keeps its sound rhythm after a kill. Only living targets take damage.
-            while (nextUltimateTick < UltimateTickTimes.Length && holdElapsed >= UltimateTickTimes[nextUltimateTick])
+            while (nextUltimateTick < UltimateTickTimes.Length && castElapsed >= UltimateTickTimes[nextUltimateTick])
             {
                 nextUltimateTick++;
-                skillAudio.Play(DanielSkillAudio.Cue.R_Tick);
                 if (!ultimateTarget.dead)
                     Hurt(ultimateTarget, ultimateTickDamage, canDetonateMark: false);
             }
@@ -735,7 +734,6 @@ public class DanielSimulator : MonoBehaviour
         if(ultimateTarget!=null) {
             Vector3 exit=MouseWorld()-ultimateTarget.body.transform.position; exit.y=0; if(exit.sqrMagnitude<.01f) exit=Vector3.forward; exit.Normalize();
             DanielSkillVfx.ExitSlash(ultimateTarget.body.transform.position,exit);
-            skillAudio.Play(DanielSkillAudio.Cue.R_Exit);
             player.transform.rotation=Quaternion.LookRotation(exit); castFacingTime=.35f;
             ultimateExitTo=ultimateTarget.body.transform.position+exit*UltimateRange;
             Hurt(ultimateTarget, ultimateExitDamage);
@@ -797,7 +795,7 @@ public class DanielSimulator : MonoBehaviour
     }
     void Cast(int index) {
         if(ultimateWindup>0) return;
-        if(ultimateTime>0) { if(index==3) ExitUltimate(); return; }
+        if(ultimateTime>0) { if(index==3) { skillAudio.SkipToUltimateExit(); ExitUltimate(); } return; }
         if(index==3 && ultimateExitTime>0) return;
         if(index==1) { foreach(var e in enemies) if(e.mark>0) { Show("영감 표식이 사라진 뒤 다시 사용할 수 있습니다."); return; } }
         if(index==2 && (shadowBuff>0 || dashTime>0)) { Show("그림자 이동이 아직 지속 중입니다."); return; }
@@ -846,7 +844,7 @@ public class DanielSimulator : MonoBehaviour
         activeUltimateCooldown = RCooldown[rLevel - 1]; attackTarget=null; stealth=0; ultimateTarget=targetR; ultimateWindup=UltimateWindupDuration; latchFrom=player.transform.position;
         if(characterAnimation) characterAnimation.PlayUltimateLatch();
         DanielSkillVfx.Latch(player.transform,UltimateWindupDuration);
-        skillAudio.Play(DanielSkillAudio.Cue.R_Latch);
+        skillAudio.PlayUltimate();
         Show("걸작: 0.5초 뒤 표적의 그림자 속으로 들어갑니다. 최대 2초 유지, R 재사용으로 커서 방향에 나옵니다.");
     }
     void ApplyMark(Enemy target)
@@ -922,7 +920,7 @@ public class DanielSimulator : MonoBehaviour
         Box(new Rect(25,211,230,62),new Color(.025f,.045f,.055f,.91f)); GUI.Label(new Rect(43,219,200,24),"체력  " + Mathf.Max(0,health).ToString("0") + " / 100",small); Box(new Rect(43,248,190,8),new Color(.18f,.22f,.23f)); Box(new Rect(43,248,190*Mathf.Max(0,health)/100,8),mint);
         if(shadowBuff>0) GUI.Label(new Rect(270,220,280,30),"그림자 평타 " + shadowBuff.ToString("0.0") + "초" + (stealth>0?" · 은신":""),label);
         int hoveredSkill = DrawSkillBar();
-        GUI.Label(new Rect(26,658,362,44),"우클릭 이동·공격 · A 공격 · S 정지\nY 시점 고정/해제 · Space 내 캐릭터 · 휠 확대/축소 · ESC 메뉴",small);
+        GUI.Label(new Rect(26,658,362,44),"우클릭 이동·공격 · A 공격 · S 정지\nY 시점 고정/해제 · Space 내 캐릭터 · 휠 확대/축소 · ESC 배치·삭제 취소",small);
         if(Button(new Rect(1095,85,155,38),"다시 시작")) ResetGame(mode);
         if(Button(new Rect(1095,130,155,38),"메인화면으로")) ResetGame(Mode.Menu);
         if (mode == Mode.Free && !ended) { DrawPracticeSettings(); HandleTargetEdit(sx, sy); }
@@ -1151,7 +1149,7 @@ public class DanielSimulator : MonoBehaviour
     }
 
     static readonly string[] PracticeTabs = { "다니엘", "일반 적", "보스" };
-    Rect PracticePanelRect => new Rect(960, 182, 290, practiceSettingsOpen ? 354 : 38);
+    Rect PracticePanelRect => new Rect(960, 182, 290, practiceSettingsOpen ? 320 : 38);
 
     void DrawPracticeSettings()
     {
@@ -1185,7 +1183,6 @@ public class DanielSimulator : MonoBehaviour
                     daggerCooldown = Mathf.Min(daggerCooldown, PracticeCooldown(daggerCooldown));
                 }
             }
-            if (Button(new Rect(973, 500, 263, 28), "메인화면으로")) ResetGame(Mode.Menu);
             return;
         }
 
@@ -1215,7 +1212,6 @@ public class DanielSimulator : MonoBehaviour
         TargetEdit place = boss ? TargetEdit.PlaceBoss : TargetEdit.PlaceEnemy;
         DrawTargetEditButton(431, place, boss ? "보스 배치" : "일반 적 배치");
         DrawTargetEditButton(463, TargetEdit.Remove, "적 삭제");
-        if (Button(new Rect(973, 500, 263, 28), "메인화면으로")) ResetGame(Mode.Menu);
     }
 
     void DrawTargetEditButton(float y, TargetEdit edit, string caption)

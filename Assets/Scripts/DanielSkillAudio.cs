@@ -6,12 +6,16 @@ public sealed class DanielSkillAudio : MonoBehaviour
     public enum Cue
     {
         Q_Cast, Q_Snap, W_Charge, W_Ready, W_Burst, E_Dash, E_Strike,
-        R_Latch, R_Enter, R_Tick, R_Exit, Attack_1, Attack_2, Step_1, Step_2, D_Cloak, D_Strike
+        Attack_1, Attack_2, Step_1, Step_2, D_Cloak, D_Strike
     }
+
+    // R_Full.wav begins at 1.94 s in the reference recording.
+    public const float UltimateEnterOffset = .50f, UltimateExitOffset = 2.26f;
 
     AudioClip[] clips;
     AudioSource oneShots;
     AudioSource charge;
+    AudioSource ultimate;
     bool alternateAttack;
 
     void Awake()
@@ -23,6 +27,8 @@ public sealed class DanielSkillAudio : MonoBehaviour
 
         oneShots = CreateSource();
         charge = CreateSource();
+        ultimate = CreateSource();
+        ultimate.clip = Resources.Load<AudioClip>("SkillAudio/R_Full");
     }
 
     AudioSource CreateSource()
@@ -52,6 +58,23 @@ public sealed class DanielSkillAudio : MonoBehaviour
         }
     }
 
+    public void PlayUltimate()
+    {
+        if (!ultimate.clip) return;
+
+        ultimate.Stop();
+        ultimate.timeSamples = 0;
+        ultimate.Play();
+    }
+
+    public void SkipToUltimateExit()
+    {
+        if (!ultimate.isPlaying) return;
+
+        int exitSample = Mathf.RoundToInt(UltimateExitOffset * ultimate.clip.frequency);
+        if (ultimate.timeSamples < exitSample) ultimate.timeSamples = exitSample;
+    }
+
     public void CancelCharge() => charge.Stop();
 
     public void PlayBasicAttack()
@@ -66,6 +89,7 @@ public sealed class DanielSkillAudio : MonoBehaviour
     public void StopAll()
     {
         oneShots.Stop();
+        ultimate.Stop();
         CancelCharge();
         alternateAttack = false;
     }
