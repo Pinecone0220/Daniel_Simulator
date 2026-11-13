@@ -64,8 +64,10 @@ public class DanielSimulator : MonoBehaviour
     static readonly float[] DaggerCooldown = { 30, 25, 20 };
     const float DaggerRange = 3f, DaggerHasteDuration = 1f, DaggerRecastDuration = 3f;
     int weaponMastery = 5, daggerRank;
-    readonly EnemySettings practiceTarget = new EnemySettings(160), practiceBoss = new EnemySettings(1000);
+    readonly EnemySettings practiceTarget = new EnemySettings(1000), practiceBoss = new EnemySettings(1000);
     int practiceTab;
+    bool fastPracticeCooldowns;
+    float PracticeCooldown(float duration) => mode == Mode.Free && fastPracticeCooldowns ? .1f : duration;
     enum TargetEdit { None, PlaceEnemy, PlaceBoss, Remove }
     TargetEdit targetEdit;
     Texture2D editCursor;
@@ -393,7 +395,7 @@ public class DanielSimulator : MonoBehaviour
         float dt=Time.deltaTime; elapsed+=dt;
         foreach (var e in enemies) if (!e.dead) AdvanceMark(e, dt);
         stealthTint=Mathf.MoveTowards(stealthTint,stealth>0?1:0,dt*(stealth>0?6:4)); castFacingTime=Mathf.Max(0,castFacingTime-dt);
-        stealth=Mathf.Max(0,stealth-dt); if(shadowBuff>0) { shadowBuff-=dt; if(shadowBuff<=0) { shadowBuff=0; cooldown[2]=shadowCooldown; } }
+        stealth=Mathf.Max(0,stealth-dt); if(shadowBuff>0) { shadowBuff-=dt; if(shadowBuff<=0) { shadowBuff=0; cooldown[2]=PracticeCooldown(shadowCooldown); } }
         if (ultimateExitTime > 0)
         {
             ultimateExitTime = Mathf.Max(0, ultimateExitTime - dt);
@@ -547,7 +549,7 @@ public class DanielSimulator : MonoBehaviour
         e.markVisual = null;
         e.markSight = null;
         skillAudio.CancelCharge();
-        cooldown[1] = WCooldown;
+        cooldown[1] = PracticeCooldown(WCooldown);
     }
 
     void UpdateEnemy(Enemy e,float dt) {
@@ -669,7 +671,7 @@ public class DanielSimulator : MonoBehaviour
             DanielSkillVfx.SmokeBurst(player.transform.position,-side); DanielSkillVfx.AttackSlash(e.body.transform.position,-side,true); castFacingTime=.3f;
             skillAudio.Play(DanielSkillAudio.Cue.E_Strike);
             Hurt(e, attackPower, DamageType.Basic, extraSkillDamage: shadowStrikeDamage);
-            stealth = 0; quietReveal = true; shadowBuff = 0; cooldown[2] = shadowCooldown;
+            stealth = 0; quietReveal = true; shadowBuff = 0; cooldown[2] = PracticeCooldown(shadowCooldown);
         } else {
             if(characterAnimation) characterAnimation.PlayAttack(false, AttackSpeedMultiplier);
             DanielSkillVfx.AttackSlash(e.body.transform.position,player.transform.forward);
@@ -756,7 +758,7 @@ public class DanielSimulator : MonoBehaviour
             daggerRank = weaponMastery / 5 - 1;
             daggerWindow = DaggerRecastDuration;
             daggerCloakVfx = DanielSkillVfx.BeginDaggerCloak(player.transform, DaggerHasteDuration);
-            daggerCooldown = DaggerCooldown[daggerRank];
+            daggerCooldown = PracticeCooldown(DaggerCooldown[daggerRank]);
             skillAudio.Play(DanielSkillAudio.Cue.D_Cloak);
             return;
         }
@@ -800,7 +802,7 @@ public class DanielSimulator : MonoBehaviour
             stealth = 0;
             qCastLevel = qLevel;
             qCastAttackPower = attackPower;
-            cooldown[0] = QCooldown[qCastLevel - 1];
+            cooldown[0] = PracticeCooldown(QCooldown[qCastLevel - 1]);
             qPoint = player.transform.position + Vector3.ClampMagnitude(mouse - player.transform.position, QCastRange);
             qPoint.y = 0;
             qAim = aim;
@@ -834,7 +836,7 @@ public class DanielSimulator : MonoBehaviour
         player.transform.rotation=Quaternion.LookRotation(aim);
         ultimateTickDamage = UltimateTickDamage;
         ultimateExitDamage = UltimateExitDamage;
-        activeUltimateCooldown = RCooldown[rLevel - 1]; cooldown[3]=activeUltimateCooldown; attackTarget=null; stealth=0; ultimateTarget=targetR; ultimateWindup=UltimateWindupDuration; latchFrom=player.transform.position;
+        activeUltimateCooldown = RCooldown[rLevel - 1]; cooldown[3]=PracticeCooldown(activeUltimateCooldown); attackTarget=null; stealth=0; ultimateTarget=targetR; ultimateWindup=UltimateWindupDuration; latchFrom=player.transform.position;
         if(characterAnimation) characterAnimation.PlayUltimateLatch();
         DanielSkillVfx.Latch(player.transform,UltimateWindupDuration);
         skillAudio.Play(DanielSkillAudio.Cue.R_Latch);
@@ -1070,7 +1072,7 @@ public class DanielSimulator : MonoBehaviour
             float shownTime = active > 0 ? active : remaining;
             if (!locked && shownTime > 0)
             {
-                DrawCooldownSweep(rect, shownTime / Mathf.Max(.01f, active > 0 ? activeDuration : cooldownDuration),
+                DrawCooldownSweep(rect, shownTime / Mathf.Max(.01f, active > 0 ? activeDuration : PracticeCooldown(cooldownDuration)),
                     active > 0 ? new Color(.02f, .25f, .34f, .60f) : new Color(.015f, .02f, .04f, .77f));
                 string time = shownTime >= 1 ? Mathf.CeilToInt(shownTime).ToString() : shownTime.ToString("0.0");
                 GUI.Label(new Rect(rect.x + 1, rect.y - 1, rect.width, rect.height), time, skillTimerShadow);
@@ -1164,6 +1166,15 @@ public class DanielSimulator : MonoBehaviour
             attackPower = DrawPracticeValue("공격력", attackPower, 357, 5, 0, float.MaxValue);
             weaponMastery = DrawPracticeValue("단검 숙련도", weaponMastery, 382, 1, 0, 15);
             skillAmplification = DrawPracticeValue("스킬 증폭", skillAmplification, 407, 5, 0, float.MaxValue);
+            if (Button(new Rect(973, 440, 263, 28), fastPracticeCooldowns ? "쿨타임 초기화 켜짐 · 0.1초" : "쿨타임 초기화 꺼짐"))
+            {
+                fastPracticeCooldowns = !fastPracticeCooldowns;
+                if (fastPracticeCooldowns)
+                {
+                    for (int i = 0; i < cooldown.Length; i++) cooldown[i] = Mathf.Min(cooldown[i], PracticeCooldown(cooldown[i]));
+                    daggerCooldown = Mathf.Min(daggerCooldown, PracticeCooldown(daggerCooldown));
+                }
+            }
             if (Button(new Rect(973, 500, 263, 28), "메인화면으로")) ResetGame(Mode.Menu);
             return;
         }
