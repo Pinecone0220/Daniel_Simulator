@@ -595,6 +595,9 @@ public class DanielSimulator : MonoBehaviour
         foreach(var e in enemies) { if(e.dead || !CanSeeEnemy(e)) continue; Vector3 screen=cam.WorldToScreenPoint(e.body.transform.position+Vector3.up); float d=Vector2.Distance(point,new Vector2(screen.x,screen.y)); if(screen.z>0 && d<distance) { distance=d; best=e; } }
         return best;
     }
+    bool IsPracticeDummy(Enemy enemy) =>
+        mode == Mode.Free && !enemy.boss && !practiceTarget.Moves && !practiceTarget.Attacks;
+
     void Hurt(Enemy e, float amount, DamageType type = DamageType.Skill, float extraSkillDamage = 0f, float trueDamage = 0f, bool canDetonateMark = true)
     {
         if (e == null || e.dead) return;
@@ -620,6 +623,7 @@ public class DanielSimulator : MonoBehaviour
         }
         if (damage > 0) e.recentDamage = 4;
         e.hp -= damage;
+        if (IsPracticeDummy(e)) e.hp = Mathf.Max(1f, e.hp);
         ShowDamage(position, basicDamage, DamageType.Basic);
         ShowDamage(position, skillDamage, DamageType.Skill);
         ShowDamage(position, trueDamage, DamageType.True);
@@ -1125,6 +1129,7 @@ public class DanielSimulator : MonoBehaviour
                 if (enemy.dead || enemy.boss != boss) continue;
                 enemy.hp = Mathf.Clamp01(enemy.hp / enemy.maxHp) * hp;
                 enemy.maxHp = hp;
+                if (IsPracticeDummy(enemy)) enemy.hp = Mathf.Max(1f, enemy.hp);
             }
         }
         settings.Defense = DrawPracticeValue("방어력", settings.Defense, 282, 5, 0, 10000);
