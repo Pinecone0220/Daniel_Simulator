@@ -103,6 +103,8 @@ public class DanielSimulator : MonoBehaviour
         public Color Color;
     }
 
+    float lastReceivedDamage, totalReceivedDamage, receivedStreakDamage, firstReceivedTime, lastReceivedTime;
+    const float PlayerMaxHealth = 100f;
     const float DamageNumberLifetime = .85f;
     readonly List<DamageNumber> damageNumbers = new List<DamageNumber>();
     GUIStyle damageNumberStyle, dummyStatsStyle;
@@ -299,6 +301,7 @@ public class DanielSimulator : MonoBehaviour
     void ResetGame(Mode next) {
         skillAudio.StopAll();
         damageNumbers.Clear();
+        lastReceivedDamage = totalReceivedDamage = receivedStreakDamage = firstReceivedTime = lastReceivedTime = 0f;
         fireZones.Clear();
         SetTargetEdit(TargetEdit.None);
         if (next != Mode.Free || mode != Mode.Free)
@@ -312,7 +315,7 @@ public class DanielSimulator : MonoBehaviour
         if(characterAnimation) characterAnimation.Footstep -= skillAudio.PlayFootstep;
         if(ultimateVfx) ultimateVfx.Stop(); ultimateVfx=null; characterAnimation=null; castFacingTime=0;
         foreach(var effect in FindObjectsByType<DanielSkillVfx>(FindObjectsSortMode.None)) Destroy(effect.gameObject);
-        mode=next; ended=false; won=false; health=100; stealth=0; shadowBuff=0; invulnerable=0; elapsed=0; hits=0; dodged=0; kills=0; stealthUses=0; attackTimer=0; ultimateTime=0; ultimateWindup=0; ultimateExitTime=0; stealthTint=0; qDelay=0; qBuffTime=0; qBuffAttacks=0; dashTime=0; nextUltimateTick=0; if(qEffect) Destroy(qEffect); attackTarget=null; ultimateTarget=null;
+        mode=next; ended=false; won=false; health=PlayerMaxHealth; stealth=0; shadowBuff=0; invulnerable=0; elapsed=0; hits=0; dodged=0; kills=0; stealthUses=0; attackTimer=0; ultimateTime=0; ultimateWindup=0; ultimateExitTime=0; stealthTint=0; qDelay=0; qBuffTime=0; qBuffAttacks=0; dashTime=0; nextUltimateTick=0; if(qEffect) Destroy(qEffect); attackTarget=null; ultimateTarget=null;
         daggerWindow = daggerCooldown = 0;
         for(int i=0;i<4;i++) cooldown[i]=0;
         foreach(var e in enemies) { if(e.body) Destroy(e.body); if(e.warning) Destroy(e.warning); } enemies.Clear();
@@ -481,9 +484,7 @@ public class DanielSimulator : MonoBehaviour
             {
                 zone.NextTick += FireInterval;
                 if (IsUntargetable || health <= 0f || !FireContains(zone, player.transform.position)) continue;
-                health -= zone.Damage;
-                ShowDamage(player.transform.position, zone.Damage, DamageType.Skill);
-                hits++;
+                HurtPlayer(zone.Damage);
             }
             if (Time.time >= end) fireZones.RemoveAt(i);
         }
@@ -643,7 +644,7 @@ public class DanielSimulator : MonoBehaviour
         }
         for(int i=shots.Count-1;i>=0;i--) {
             Shot s=shots[i]; s.body.transform.position+=s.velocity*dt; s.life-=dt;
-            if(s.damage>0 && Vector3.Distance(s.body.transform.position,player.transform.position+Vector3.up*.55f)<.75f && invulnerable<=0 && !IsUntargetable) { health-=s.damage; ShowDamage(player.transform.position, s.damage, DamageType.Skill); hits++; invulnerable=.6f; s.life=0; Show("피격! 진입하기 전에 투사체를 피하세요."); }
+            if(s.damage>0 && Vector3.Distance(s.body.transform.position,player.transform.position+Vector3.up*.55f)<.75f && invulnerable<=0 && !IsUntargetable) { HurtPlayer(s.damage); invulnerable=.6f; s.life=0; Show("피격! 진입하기 전에 투사체를 피하세요."); }
             if(s.life<=0 || Mathf.Abs(s.body.transform.position.x)>13 || Mathf.Abs(s.body.transform.position.z)>10) { if(s.life>0) dodged++; Destroy(s.body); shots.RemoveAt(i); }
         }
         UpdateFireZones();
@@ -1062,9 +1063,17 @@ public class DanielSimulator : MonoBehaviour
         }
         string title=mode==Mode.Puzzle1?"01  진입의 순간":mode==Mode.Puzzle2?"02  먼저 피하기":mode==Mode.Puzzle3?"03  위험한 암살":"∞  자유 연습";
         string goal=mode==Mode.Puzzle1?"2회 이하 피격으로 표적 처치":mode==Mode.Puzzle2?"투사체 2회 회피 후 표적 처치":mode==Mode.Puzzle3?"은신 사용 후 3회 이하 피격으로 두 표적 처치":"연습 설정에서 적을 배치할 수 있습니다.";
+        if (mode == Mode.Free)
+        {
+            DrawReceivedDamage();
+            DrawPlayerHealthHud();
+        }
+        else
+        {
         Box(new Rect(25,84,370,116),new Color(.025f,.045f,.055f,.91f)); GUI.Label(new Rect(43,96,340,30),title,label); GUI.Label(new Rect(43,126,330,24),goal,small); GUI.Label(new Rect(43,155,335,30),"피격 " + hits + "   ·   회피 " + dodged + "   ·   처치 " + kills, label);
         Box(new Rect(25,211,230,62),new Color(.025f,.045f,.055f,.91f)); GUI.Label(new Rect(43,219,200,24),"체력  " + Mathf.Max(0,health).ToString("0") + " / 100",small); Box(new Rect(43,248,190,8),new Color(.18f,.22f,.23f)); Box(new Rect(43,248,190*Mathf.Max(0,health)/100,8),mint);
         if(shadowBuff>0) GUI.Label(new Rect(270,220,280,30),"그림자 평타 " + shadowBuff.ToString("0.0") + "초" + (stealth>0?" · 은신":""),label);
+        }
         int hoveredSkill = DrawSkillBar();
         GUI.Label(new Rect(26,658,362,44),"우클릭 이동·공격 · A 공격 · S 정지\nY 시점 고정/해제 · Space 내 캐릭터 · 휠 확대/축소 · ESC 배치·삭제 취소",small);
         if(Button(new Rect(1095,85,155,38),"다시 시작")) ResetGame(mode);
@@ -1083,6 +1092,49 @@ public class DanielSimulator : MonoBehaviour
         DrawDamageNumbers(sx, sy);
         if (!ended && hoveredSkill >= 0) DrawSkillTooltip(hoveredSkill);
         if(ended) { Box(new Rect(0,64,1280,656),new Color(0,0,0,.68f)); Box(new Rect(400,220,480,260),new Color(.04f,.075f,.08f,.98f)); GUI.Label(new Rect(430,246,420,45),won?"훈련 성공":"훈련 종료",heading); GUI.Label(new Rect(430,300,400,50),won?"좋은 진입이었습니다.":"목표 조건을 확인하고 다시 도전하세요.",label); GUI.Label(new Rect(430,348,400,30),"피격 " + hits + "   ·   회피 " + dodged + "   ·   처치 " + kills + "   ·   " + elapsed.ToString("0.0") + "초",small); if(Button(new Rect(430,399,185,48),"다시 도전")) ResetGame(mode); if(Button(new Rect(630,399,185,48),"메인화면으로")) ResetGame(Mode.Menu); }
+    }
+
+    void HurtPlayer(float damage)
+    {
+        health -= damage;
+        if (mode == Mode.Free)
+        {
+            health = Mathf.Max(1f, health);
+            float now = Time.time;
+            if (receivedStreakDamage <= 0f || now - lastReceivedTime >= DummyHealDelay)
+            {
+                firstReceivedTime = now;
+                receivedStreakDamage = 0f;
+            }
+            lastReceivedTime = now;
+            lastReceivedDamage = damage;
+            totalReceivedDamage += damage;
+            receivedStreakDamage += damage;
+        }
+        ShowDamage(player.transform.position, damage, DamageType.Skill);
+        hits++;
+    }
+
+    void DrawReceivedDamage()
+    {
+        bool active = receivedStreakDamage > 0f && Time.time - lastReceivedTime < DummyHealDelay;
+        float dps = active ? receivedStreakDamage / Mathf.Max(1f, lastReceivedTime - firstReceivedTime) : 0f;
+        Box(new Rect(25,84,262,114),new Color(.025f,.045f,.055f,.91f));
+        GUI.Label(new Rect(40,93,232,24),"받은 피해",skillTooltipTitle);
+        GUI.Label(new Rect(40,119,232,22),$"직전 피해   {FormatDamage(active ? lastReceivedDamage : 0f)}",label);
+        GUI.Label(new Rect(40,142,232,22),$"총합 피해   {FormatDamage(totalReceivedDamage)}",label);
+        GUI.Label(new Rect(40,165,232,22),$"DPS          {FormatDamage(dps)}",label);
+    }
+
+    void DrawPlayerHealthHud()
+    {
+        var frame = new Rect(458, 609, 364, 23);
+        Box(frame, new Color(.22f, .29f, .32f, .96f));
+        var fill = new Rect(frame.x + 2, frame.y + 2, frame.width - 4, frame.height - 4);
+        Box(fill, new Color(.025f, .05f, .052f, .98f));
+        fill.width *= Mathf.Clamp01(health / PlayerMaxHealth);
+        if (fill.width > 0f) Box(fill, new Color(.17f, .63f, .38f, .98f));
+        GUI.Label(frame, $"{FormatDamage(health)} / {FormatDamage(PlayerMaxHealth)}", skillKeyStyle);
     }
 
     void ShowDamage(Vector3 position, float amount, DamageType type)
@@ -1416,8 +1468,8 @@ public class DanielSimulator : MonoBehaviour
 
         Event input = Event.current;
         Vector2 point = input.mousePosition;
-        bool overHud = point.y < 64 || point.y >= 628 || PracticePanelRect.Contains(point) ||
-            new Rect(1095, 85, 155, 83).Contains(point) || new Rect(25, 84, 370, 189).Contains(point);
+        bool overHud = point.y < 64 || point.y >= 628 || new Rect(458, 609, 364, 23).Contains(point) || PracticePanelRect.Contains(point) ||
+            new Rect(1095, 85, 155, 83).Contains(point) || new Rect(25, 84, 262, 114).Contains(point);
         if (input.type == EventType.MouseDown && input.button == 0 && !overHud)
         {
             if (targetEdit == TargetEdit.Remove)
