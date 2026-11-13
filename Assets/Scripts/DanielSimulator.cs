@@ -13,6 +13,7 @@ public class DanielSimulator : MonoBehaviour
         public float maxHp = 160, markStoreRatio, markSkillDamage;
         public readonly List<GameObject> outline = new List<GameObject>(); public bool outlined;
         public Vector3 direction;
+        public float daggerSlowTime, daggerSlowFactor;
         public float hp = 160, timer, windup = -1, slow, slowFactor=1, markSlow, mark, storedDamage, recentDamage, visionDebuff, silence;
         public DanielSkillVfx ultimateLink;
         public bool dead, boss;
@@ -49,6 +50,14 @@ public class DanielSimulator : MonoBehaviour
     float UltimateTickDamage => RTickDamage[rLevel - 1] + .3f * attackPower;
     float UltimateExitDamage => RExitDamage[rLevel - 1] + .9f * attackPower;
     Enemy attackTarget, ultimateTarget;
+    static readonly float[] DaggerDamage = { 10, 30, 50 };
+    static readonly float[] DaggerHaste = { .30f, .35f, .40f };
+    static readonly float[] DaggerSlow = { .20f, .25f, .30f };
+    static readonly float[] DaggerCooldown = { 30, 25, 20 };
+    const float DaggerRange = 3f;
+    int weaponMastery = 5, daggerRank;
+    float skillAmplification, daggerWindow, daggerCooldown;
+    Texture2D daggerIcon;
     float[] cooldown = new float[4];
     int hits, dodged, kills, stealthUses;
     bool ended, won;
@@ -93,7 +102,7 @@ public class DanielSimulator : MonoBehaviour
     void Start() {
         skillAudio = gameObject.AddComponent<DanielSkillAudio>();
         font = Font.CreateDynamicFontFromOSFont(new[] { "Malgun Gothic", "Arial" }, 18);
-        white = Texture2D.whiteTexture; markerColor=new MaterialPropertyBlock();
+        daggerIcon = Resources.Load<Texture2D>("DaggerSkill"); white = Texture2D.whiteTexture; markerColor=new MaterialPropertyBlock();
         // Soft-edged frame used to tint the screen while stealthed.
         vignette=new Texture2D(128,128,TextureFormat.RGBA32,false); vignette.wrapMode=TextureWrapMode.Clamp;
         for(int y=0;y<128;y++) for(int x=0;x<128;x++) {
@@ -243,6 +252,7 @@ public class DanielSimulator : MonoBehaviour
         if(ultimateVfx) ultimateVfx.Stop(); ultimateVfx=null; characterAnimation=null; castFacingTime=0;
         foreach(var effect in FindObjectsByType<DanielSkillVfx>(FindObjectsSortMode.None)) Destroy(effect.gameObject);
         mode=next; ended=false; won=false; health=100; stealth=0; shadowBuff=0; invulnerable=0; elapsed=0; hits=0; dodged=0; kills=0; stealthUses=0; attackTimer=0; ultimateTime=0; ultimateWindup=0; ultimateExitTime=0; stealthTint=0; qDelay=0; qBuffTime=0; qBuffAttacks=0; dashTime=0; nextUltimateTick=0; if(qEffect) Destroy(qEffect); attackTarget=null; ultimateTarget=null;
+        daggerWindow = daggerCooldown = 0;
         for(int i=0;i<4;i++) cooldown[i]=0;
         foreach(var e in enemies) { if(e.body) Destroy(e.body); if(e.warning) Destroy(e.warning); } enemies.Clear();
         foreach(var s in shots) if(s.body) Destroy(s.body); shots.Clear();
@@ -348,6 +358,8 @@ public class DanielSimulator : MonoBehaviour
         invulnerable=Mathf.Max(0,invulnerable-dt); qBuffTime=Mathf.Max(0,qBuffTime-dt); if(qBuffTime<=0) qBuffAttacks=0;
         if(qDelay>0) { qDelay-=dt; if(qDelay<=0) ResolveQ(); }
         if(dashTime>0) { afterimageTimer-=dt; if(afterimageTimer<=0 && characterAnimation) { DanielSkillVfx.Afterimage(characterAnimation.transform,.3f); afterimageTimer=.045f; } dashTime=Mathf.Max(0,dashTime-dt); { float dashK=1-dashTime/DashTravel; player.transform.position=Vector3.Lerp(dashFrom,dashTo,1-(1-dashK)*(1-dashK)); } destination=player.transform.position; }
+        daggerWindow = Mathf.Max(0, daggerWindow - dt);
+        daggerCooldown = Mathf.Max(0, daggerCooldown - dt);
         for(int i=0;i<4;i++) cooldown[i]=Mathf.Max(0,cooldown[i]-dt);
         if(!IsUntargetable && Mouse.current!=null && Mouse.current.rightButton.wasPressedThisFrame) {
             Enemy clicked=EnemyAtCursor();
@@ -400,6 +412,7 @@ public class DanielSimulator : MonoBehaviour
                 if(nearest!=null) { attackTarget=nearest; DanielSkillVfx.ClickMarker(nearest.body.transform.position,true); } else Show("A: 커서 근처에 공격할 적이 없습니다.");
             }
             if(Keyboard.current.qKey.wasPressedThisFrame) Cast(0); if(Keyboard.current.wKey.wasPressedThisFrame) Cast(1); if(Keyboard.current.eKey.wasPressedThisFrame) Cast(2); if(Keyboard.current.rKey.wasPressedThisFrame) Cast(3);
+            if(Keyboard.current.dKey.wasPressedThisFrame) CastDagger();
             if(Keyboard.current.escapeKey.wasPressedThisFrame) { ResetGame(Mode.Menu); return; }
         }
         // Stealth presentation: smoke veil while hidden, a reveal ring when it ends on its own or is broken by a skill.
@@ -418,8 +431,9 @@ public class DanielSimulator : MonoBehaviour
             if(e.ultimateLink) e.ultimateLink.SetRangeHighlight(Vector3.Distance(e.body.transform.position,player.transform.position)<=UltimateRange);
         }
         Vector3 delta=(IsUntargetable || dashTime>0)?Vector3.zero:destination-player.transform.position; delta.y=0;
-        if(delta.magnitude>.08f) { player.transform.position+=delta.normalized*Mathf.Min(delta.magnitude, 4.4f*dt); if(castFacingTime<=0) player.transform.rotation=Quaternion.RotateTowards(player.transform.rotation,Quaternion.LookRotation(delta),1080*dt); }
-        if(characterAnimation) { characterAnimation.SetMoving(delta.magnitude>.08f && dashTime<=0 && ultimateTime<=0?4.4f:0); characterAnimation.SetStealth(stealth>0 || ultimateWindup>0); characterAnimation.SetUntargetableTint(IsUntargetable); }
+        float moveSpeed = 4.4f * (1f + (daggerWindow > 0 ? DaggerHaste[daggerRank] : 0f));
+        if(delta.magnitude>.08f) { player.transform.position+=delta.normalized*Mathf.Min(delta.magnitude, moveSpeed*dt); if(castFacingTime<=0) player.transform.rotation=Quaternion.RotateTowards(player.transform.rotation,Quaternion.LookRotation(delta),1080*dt); }
+        if(characterAnimation) { characterAnimation.SetMoving(delta.magnitude>.08f && dashTime<=0 && ultimateTime<=0?moveSpeed:0); characterAnimation.SetStealth(stealth>0 || ultimateWindup>0); characterAnimation.SetUntargetableTint(IsUntargetable); }
         float swing=delta.magnitude>.1f?Mathf.Sin(Time.time*11)*25:0;
         if(leftLeg) leftLeg.localRotation=Quaternion.Euler(swing,0,0); if(rightLeg) rightLeg.localRotation=Quaternion.Euler(-swing,0,0);
         if(leftArm) leftArm.localRotation=Quaternion.Euler(-swing*.7f,0,-10); if(rightArm) rightArm.localRotation=Quaternion.Euler(swing*.7f,0,10);
@@ -499,6 +513,7 @@ public class DanielSimulator : MonoBehaviour
         if (seesPlayer && face.sqrMagnitude > .01f) e.body.transform.rotation = Quaternion.LookRotation(face);
         e.silence = Mathf.Max(0, e.silence - dt);
         e.slow = Mathf.Max(0, e.slow - dt);
+        e.daggerSlowTime = Mathf.Max(0, e.daggerSlowTime - dt);
         e.markSlow = Mathf.Max(0, e.markSlow - dt);
         if (e.slow <= 0) e.slowFactor = 1;
         e.timer -= dt;
@@ -507,6 +522,7 @@ public class DanielSimulator : MonoBehaviour
             Vector3 away=e.body.transform.position-player.transform.position; away.y=0;
             if(away.magnitude<4.5f && away.sqrMagnitude>.01f) {
                 float movementFactor = e.markSlow > 0 ? .5f : e.slowFactor;
+                if (e.daggerSlowTime > 0) movementFactor = Mathf.Min(movementFactor, e.daggerSlowFactor);
                 Vector3 next=e.body.transform.position+away.normalized*1.3f*movementFactor*dt;
                 next.x=Mathf.Clamp(next.x,-11.5f,11.5f); next.z=Mathf.Clamp(next.z,-8.5f,8.5f); e.body.transform.position=next;
             }
@@ -643,6 +659,42 @@ public class DanielSimulator : MonoBehaviour
         castFacingTime=0;
         if(characterAnimation) characterAnimation.CancelUltimateExit();
     }
+    void CastDagger()
+    {
+        if (ultimateWindup > 0 || ultimateTime > 0 || dashTime > 0) return;
+        if (daggerWindow <= 0)
+        {
+            if (weaponMastery < 5 || daggerCooldown > 0) return;
+            CancelUltimateExit();
+            daggerRank = weaponMastery / 5 - 1;
+            daggerWindow = 1f;
+            daggerCooldown = DaggerCooldown[daggerRank];
+            return;
+        }
+
+        Enemy target = EnemyAtCursor();
+        if (target == null || Vector3.Distance(player.transform.position, target.body.transform.position) > DaggerRange)
+            return;
+
+        CancelUltimateExit();
+        daggerWindow = 0;
+        stealth = 0;
+        attackTarget = null;
+        Vector3 targetPosition = target.body.transform.position;
+        Vector3 behind = targetPosition - target.body.transform.forward * 1.2f;
+        behind.x = Mathf.Clamp(behind.x, -11.8f, 11.8f);
+        behind.z = Mathf.Clamp(behind.z, -8.8f, 8.8f);
+        DanielSkillVfx.DashTrail(player.transform.position, behind);
+        player.transform.position = destination = behind;
+        Vector3 facing = targetPosition - behind;
+        if (facing.sqrMagnitude > .001f) player.transform.rotation = Quaternion.LookRotation(facing);
+        castFacingTime = .25f;
+        if (characterAnimation) characterAnimation.PlayAttack();
+        target.daggerSlowTime = 1f;
+        target.daggerSlowFactor = 1f - DaggerSlow[daggerRank];
+        float skillDamage = DaggerDamage[daggerRank] + .5f * BonusAttackPower + .25f * skillAmplification;
+        Hurt(target, skillDamage, extraSkillDamage: .08f * target.hp);
+    }
     void Cast(int index) {
         if(ultimateWindup>0) return;
         if(ultimateTime>0) { if(index==3) ExitUltimate(); return; }
@@ -763,7 +815,13 @@ public class DanielSimulator : MonoBehaviour
         if(shadowBuff>0) GUI.Label(new Rect(270,220,280,30),"그림자 평타 " + shadowBuff.ToString("0.0") + "초" + (stealth>0?" · 은신":""),label);
         string[] keys={"Q","W","E","R"}; string[] names={"그림자 가위","영감 표식","그림자 이동","걸작"};
         for(int i=0;i<4;i++) { float x=396+i*125; Box(new Rect(x,642,115,57),new Color(.025f,.045f,.055f,.94f)); GUI.Label(new Rect(x+9,647,100,23),keys[i]+"  "+names[i],small); GUI.Label(new Rect(x+9,670,100,23),(i==2 && shadowBuff>0)?"강화 중":(i==1 && enemies.Exists(e=>e.mark>0))?"표식 유지":cooldown[i]>0?cooldown[i].ToString("0.0")+"초":"준비",label); }
-        GUI.Label(new Rect(26,658,362,44),"우클릭 이동·공격(누르고 있으면 계속 이동) · A 공격 · S 정지\nY 시점 고정/해제 · Space 내 캐릭터 · 휠 확대/축소 · ESC 메뉴",small);
+        Box(new Rect(896,642,165,57),new Color(.025f,.045f,.055f,.94f));
+        if (daggerIcon) GUI.DrawTexture(new Rect(901,649,42,42), daggerIcon);
+        GUI.Label(new Rect(949,647,112,23), "D  망토와 단검", small);
+        string daggerStatus = daggerWindow > 0 ? $"단검 {daggerWindow:0.0}초" :
+            weaponMastery < 5 ? "숙련도 5 필요" : daggerCooldown > 0 ? $"{daggerCooldown:0.0}초" : "준비";
+        GUI.Label(new Rect(949,670,112,23), daggerStatus, small);
+        GUI.Label(new Rect(26,658,362,44),"우클릭 이동·공격 · A 공격 · S 정지\nY 시점 고정/해제 · Space 내 캐릭터 · 휠 확대/축소 · ESC 메뉴",small);
         if(Button(new Rect(1095,85,155,38),"다시 시작")) ResetGame(mode);
         if(Button(new Rect(1095,130,155,38),"메뉴로")) ResetGame(Mode.Menu);
         if (mode == Mode.Free && !ended) DrawPracticeSettings();
@@ -773,7 +831,7 @@ public class DanielSimulator : MonoBehaviour
 
     void DrawPracticeSettings()
     {
-        Box(new Rect(960, 182, 290, 337), new Color(.025f, .045f, .055f, .91f));
+        Box(new Rect(960, 182, 290, 365), new Color(.025f, .045f, .055f, .91f));
         qLevel = DrawPracticeValue("Q 레벨", qLevel, 191, 1, 1, QDamage.Length);
         wLevel = DrawPracticeValue("W 레벨", wLevel, 219, 1, 1, WDamage.Length);
         eLevel = DrawPracticeValue("E 레벨", eLevel, 247, 1, 1, EDamage.Length);
@@ -790,8 +848,10 @@ public class DanielSimulator : MonoBehaviour
             $"E 추가 {ShadowStrikeDamage:0.#} · 은신 {EStealth[eLevel - 1]:0.#}초 · {ECooldown[eLevel - 1]:0}초", small);
         GUI.Label(new Rect(973, 425, 265, 22),
             $"R 틱 {UltimateTickDamage:0.#} · 마지막 {UltimateExitDamage:0.#} · {RCooldown[rLevel - 1]:0}초", small);
+        weaponMastery = DrawPracticeValue("단검 숙련도", weaponMastery, 451, 1, 0, 15);
+        skillAmplification = DrawPracticeValue("스킬 증폭", skillAmplification, 479, 5, 0, float.MaxValue);
         if (!enemies.Exists(e => e.boss && !e.dead) &&
-            Button(new Rect(973, 452, 263, 33), "연습 보스 추가"))
+            Button(new Rect(973, 507, 263, 33), "연습 보스 추가"))
             AddEnemy(new Vector3(3, 0, -5), 1f, boss: true);
     }
 
