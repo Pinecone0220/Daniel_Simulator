@@ -98,8 +98,14 @@ public class DanielSimulator : MonoBehaviour
     readonly Texture2D[] skillIcons = new Texture2D[SkillKeys.Length];
     Texture2D cooldownSweep, danielPortrait;
     const int PassiveSlot = 4, WeaponSlot = 5;
-    const float SkillSlotX = 493f, SkillSlotY = 624f, SkillSlotSize = 52f, SkillSlotSpacing = 58f;
-    static readonly Rect CombatHud = new Rect(375, 614, 475, 94);
+    const float SkillSlotX = 425f, SkillSlotY = 607f, SkillSlotSize = 48f, SkillSlotSpacing = 55f;
+    static readonly Rect CombatHud = new Rect(66, 600, 1148, 119);
+    static readonly Color HudBackground = new Color(.075f, .109f, .145f, .98f);
+    static readonly Color HudSlot = new Color(.036f, .054f, .074f, .98f);
+    static readonly Color HudEdge = new Color(.18f, .25f, .32f, 1f);
+    static readonly string[] InventoryKeys = { "2", "3", "4", "5", "1", "6", "7", "8", "9", "0" };
+    static readonly string[] EquipmentLabels = { "무기", "머리", "옷", "팔", "다리" };
+    static readonly string[] EquipmentGlyphs = { "⚔", "◒", "◆", "▰", "▱" };
     DanielSkillVfx daggerCloakVfx;
     enum DamageType { Skill, Basic, True }
     struct DamageNumber
@@ -635,9 +641,8 @@ public class DanielSimulator : MonoBehaviour
             if(e.ultimateLink) e.ultimateLink.SetRangeHighlight(Vector3.Distance(e.body.transform.position,player.transform.position)<=UltimateRange);
         }
         Vector3 delta=(IsUntargetable || dashTime>0)?Vector3.zero:destination-player.transform.position; delta.y=0;
-        float moveSpeed = 4.4f * (1f + (daggerWindow > DaggerRecastDuration - DaggerHasteDuration ? DaggerHaste[daggerRank] : 0f));
-        if (IsNight) moveSpeed *= 1f + PassiveSpeed[passiveLevel - 1];
-        if (IsInFire(player.transform.position)) moveSpeed *= .7f;
+        float moveSpeed = CurrentMoveSpeed();
+
         if(delta.magnitude>.08f) { player.transform.position+=delta.normalized*Mathf.Min(delta.magnitude, moveSpeed*dt); if(castFacingTime<=0) player.transform.rotation=Quaternion.RotateTowards(player.transform.rotation,Quaternion.LookRotation(delta),1080*dt); }
         if(characterAnimation) { characterAnimation.SetMoving(delta.magnitude>.08f && dashTime<=0 && ultimateTime<=0?moveSpeed:0); characterAnimation.SetStealth(stealth>0 || ultimateWindup>0); characterAnimation.SetUntargetableTint(IsUntargetable); }
         float swing=delta.magnitude>.1f?Mathf.Sin(Time.time*11)*25:0;
@@ -1085,9 +1090,9 @@ public class DanielSimulator : MonoBehaviour
         Box(new Rect(25,84,370,116),new Color(.025f,.045f,.055f,.91f)); GUI.Label(new Rect(43,96,340,30),title,label); GUI.Label(new Rect(43,126,330,24),goal,small); GUI.Label(new Rect(43,155,335,30),"피격 " + hits + "   ·   회피 " + dodged + "   ·   처치 " + kills, label);
         if(shadowBuff>0) GUI.Label(new Rect(270,220,280,30),"그림자 평타 " + shadowBuff.ToString("0.0") + "초" + (stealth>0?" · 은신":""),label);
         }
-        DrawPlayerHealthHud();
+        DrawCombatHud();
         int hoveredSkill = DrawSkillBar();
-        GUI.Label(new Rect(26,658,362,44),"우클릭 이동·공격 · A 공격 · S 정지\nY 시점 고정/해제 · Space 내 캐릭터 · 휠 확대/축소 · ESC 배치·삭제 취소",small);
+        GUI.Label(new Rect(70,554,362,44),"우클릭 이동·공격 · A 공격 · S 정지\nY 시점 고정/해제 · Space 내 캐릭터 · 휠 확대/축소 · ESC 배치·삭제 취소",small);
         if(Button(new Rect(1095,85,155,38),"다시 시작")) ResetGame(mode);
         if(Button(new Rect(1095,130,155,38),"메인화면으로")) ResetGame(Mode.Menu);
         if (mode == Mode.Free && !ended) { DrawPracticeSettings(); HandleTargetEdit(sx, sy); }
@@ -1138,20 +1143,80 @@ public class DanielSimulator : MonoBehaviour
         GUI.Label(new Rect(40,165,232,22),$"DPS          {FormatDamage(dps)}",label);
     }
 
-    void DrawPlayerHealthHud()
+    float CurrentMoveSpeed()
     {
-        Box(CombatHud, new Color(.035f, .060f, .085f, .96f));
-        Box(new Rect(CombatHud.x, CombatHud.y, CombatHud.width, 1), new Color(.30f, .38f, .46f));
-        if (danielPortrait) GUI.DrawTexture(new Rect(387, 607, 98, 98), danielPortrait, ScaleMode.ScaleToFit);
-        Box(new Rect(494, 683, 47, 17), new Color(.08f, .12f, .18f));
-        GUI.Label(new Rect(494, 683, 47, 17), IsNight ? "밤" : "낮", skillKeyStyle);
-        var frame = new Rect(548, 683, 285, 17);
-        Box(frame, new Color(.22f, .29f, .32f, .96f));
-        var fill = new Rect(frame.x + 2, frame.y + 2, frame.width - 4, frame.height - 4);
-        Box(fill, new Color(.025f, .05f, .052f, .98f));
+        float speed = 4.4f;
+        if (daggerWindow > DaggerRecastDuration - DaggerHasteDuration) speed *= 1f + DaggerHaste[daggerRank];
+        if (IsNight) speed *= 1f + PassiveSpeed[passiveLevel - 1];
+        if (IsInFire(player.transform.position)) speed *= .7f;
+        return speed;
+    }
+
+    void DrawCombatHud()
+    {
+        Box(CombatHud, HudBackground);
+        Box(new Rect(CombatHud.x, CombatHud.y, CombatHud.width, 1), HudEdge);
+
+        DrawHudStat(76, 609, "공격력", FormatDamage(attackPower), new Color(1f, .81f, .42f));
+        DrawHudStat(151, 609, "스킬 증폭", FormatDamage(skillAmplification), new Color(.81f, .64f, 1f));
+        DrawHudStat(76, 634, "방어 관통", "—", new Color(.93f, .58f, .67f));
+        DrawHudStat(151, 634, "방어력", "0", new Color(.60f, .79f, 1f));
+        DrawHudStat(76, 659, "공격 속도", (AttackSpeedMultiplier / BasicAttackInterval).ToString("0.00"), ink);
+        DrawHudStat(151, 659, "쿨타임 감소", fastPracticeCooldowns && mode == Mode.Free ? "연습" : "0%", ink);
+        DrawHudStat(76, 684, "치명타", "—", new Color(1f, .53f, .53f));
+        DrawHudStat(151, 684, "이동 속도", CurrentMoveSpeed().ToString("0.00"), ink);
+
+        for (int i = 0; i < EquipmentLabels.Length; i++)
+        {
+            var slot = new Rect(228, 602 + i * 23, 34, 22);
+            DrawHudSlot(slot, null);
+            GUI.Label(slot, EquipmentGlyphs[i], skillKeyStyle);
+            if (slot.Contains(Event.current.mousePosition))
+                GUI.Label(new Rect(224, 574, 86, 22), EquipmentLabels[i], skillTooltipTitle);
+        }
+
+        Box(new Rect(273, 602, 141, 115), new Color(.047f, .073f, .099f, .98f));
+        if (danielPortrait) GUI.DrawTexture(new Rect(281, 600, 116, 116), danielPortrait, ScaleMode.ScaleToFit);
+        DrawHudSlot(new Rect(276, 685, 36, 28), IsNight ? "밤" : "낮");
+
+        var healthFrame = new Rect(SkillSlotX, 680, 269, 19);
+        Box(healthFrame, HudEdge);
+        var fill = new Rect(healthFrame.x + 1, healthFrame.y + 1, healthFrame.width - 2, healthFrame.height - 2);
+        Box(fill, HudSlot);
         fill.width *= Mathf.Clamp01(health / PlayerMaxHealth);
         if (fill.width > 0f) Box(fill, new Color(.52f, .78f, .20f, .98f));
-        GUI.Label(frame, $"{FormatDamage(health)} / {FormatDamage(PlayerMaxHealth)}", skillKeyStyle);
+        GUI.Label(healthFrame, $"{FormatDamage(health)} / {FormatDamage(PlayerMaxHealth)}", skillKeyStyle);
+
+        DrawHudSlot(new Rect(744, SkillSlotY, 48, SkillSlotSize), "F");
+        DrawHudSlot(new Rect(706, 676, 86, 28), "◇  —");
+        DrawHudSlot(new Rect(819, 608, 30, 48), "B");
+        DrawHudSlot(new Rect(819, 663, 30, 42), "V");
+
+        for (int i = 0; i < InventoryKeys.Length; i++)
+        {
+            int row = i / 5, col = i % 5;
+            DrawHudSlot(new Rect(855 + col * 71, 608 + row * 54, 68, 51), InventoryKeys[i]);
+        }
+    }
+
+    void DrawHudStat(float x, float y, string name, string value, Color color)
+    {
+        GUI.color = color;
+        GUI.Label(new Rect(x, y, 74, 14), name, small);
+        GUI.color = Color.white;
+        GUI.Label(new Rect(x, y + 11, 74, 18), value, skillTooltipTitle);
+    }
+
+    void DrawHudSlot(Rect slot, string key)
+    {
+        Box(slot, HudEdge);
+        Box(new Rect(slot.x + 1, slot.y + 1, slot.width - 2, slot.height - 2), HudSlot);
+        if (key != null)
+        {
+            var badge = new Rect(slot.x + 3, slot.y + 3, Mathf.Min(slot.width - 6, 40), 16);
+            Box(badge, new Color(.12f, .18f, .24f));
+            GUI.Label(badge, key, skillKeyStyle);
+        }
     }
 
     void ShowDamage(Vector3 position, float amount, DamageType type)
@@ -1260,6 +1325,8 @@ public class DanielSimulator : MonoBehaviour
         }
     }
 
+    static float SkillSlotPosition(int index) => SkillSlotX + index * SkillSlotSpacing - (index >= PassiveSlot ? 10f : 0f);
+
     int DrawSkillBar()
     {
         int hovered = -1;
@@ -1281,7 +1348,7 @@ public class DanielSimulator : MonoBehaviour
                 default: cooldownDuration = DaggerCooldown[daggerRank]; active = daggerWindow; activeDuration = DaggerRecastDuration; break;
             }
 
-            var rect = new Rect(SkillSlotX + i * SkillSlotSpacing, SkillSlotY, SkillSlotSize, SkillSlotSize);
+            var rect = new Rect(SkillSlotPosition(i), SkillSlotY, SkillSlotSize, SkillSlotSize);
             bool isHovered = rect.Contains(cursor);
             if (isHovered) hovered = i;
             bool locked = (i == WeaponSlot && weaponMastery < 5 && active <= 0) || (i == PassiveSlot && !IsNight);
@@ -1303,7 +1370,7 @@ public class DanielSimulator : MonoBehaviour
                 GUI.Label(new Rect(rect.x + 1, rect.y - 1, rect.width, rect.height), time, skillTimerShadow);
                 GUI.Label(new Rect(rect.x, rect.y - 2, rect.width, rect.height), time, skillTimerStyle);
             }
-            var key = new Rect(rect.xMax - 21, rect.yMax - 20, 19, 18);
+            var key = new Rect(rect.x + 2, rect.yMax - 19, 17, 17);
             Box(key, new Color(.02f, .03f, .05f, .92f));
             GUI.Label(key, SkillKeys[i], skillKeyStyle);
         }
@@ -1361,7 +1428,7 @@ public class DanielSimulator : MonoBehaviour
 
         const float width = 350;
         float bodyHeight = label.CalcHeight(new GUIContent(details), width - 24);
-        float x = Mathf.Clamp(SkillSlotX + index * SkillSlotSpacing + SkillSlotSize / 2f - width / 2f, 12, 1268 - width);
+        float x = Mathf.Clamp(SkillSlotPosition(index) + SkillSlotSize / 2f - width / 2f, 12, 1268 - width);
         float y = CombatHud.y - bodyHeight - 58;
         Box(new Rect(x - 1, y - 1, width + 2, bodyHeight + 48), new Color(.29f, .38f, .47f));
         Box(new Rect(x, y, width, bodyHeight + 46), new Color(.045f, .065f, .095f, .98f));
@@ -1504,7 +1571,7 @@ public class DanielSimulator : MonoBehaviour
 
         Event input = Event.current;
         Vector2 point = input.mousePosition;
-        bool overHud = point.y < 64 || point.y >= 628 || CombatHud.Contains(point) || PracticePanelRect.Contains(point) ||
+        bool overHud = point.y < 64 || point.y >= CombatHud.y || PracticePanelRect.Contains(point) ||
             new Rect(1095, 85, 155, 83).Contains(point) || new Rect(25, 84, 262, 114).Contains(point);
         if (input.type == EventType.MouseDown && input.button == 0 && !overHud)
         {
