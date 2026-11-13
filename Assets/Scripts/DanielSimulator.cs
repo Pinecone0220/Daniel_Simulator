@@ -552,6 +552,8 @@ public class DanielSimulator : MonoBehaviour
 
     void UpdateEnemy(Enemy e,float dt) {
         if(e.dead) return;
+        if (IsPracticeDummy(e) && e.hp < e.maxHp && Time.time - e.lastDamageTime >= DummyHealDelay)
+            e.hp = e.maxHp;
         Vector3 face = player.transform.position - e.body.transform.position;
         face.y = 0;
         var settings = mode == Mode.Free ? (e.boss ? practiceBoss : practiceTarget) : null;
@@ -596,6 +598,8 @@ public class DanielSimulator : MonoBehaviour
         foreach(var e in enemies) { if(e.dead || !CanSeeEnemy(e)) continue; Vector3 screen=cam.WorldToScreenPoint(e.body.transform.position+Vector3.up); float d=Vector2.Distance(point,new Vector2(screen.x,screen.y)); if(screen.z>0 && d<distance) { distance=d; best=e; } }
         return best;
     }
+    const float DummyHealDelay = 3f;
+
     bool IsPracticeDummy(Enemy enemy) =>
         mode == Mode.Free && !enemy.boss && !practiceTarget.Moves && !practiceTarget.Attacks;
 
@@ -908,7 +912,14 @@ public class DanielSimulator : MonoBehaviour
         if(Button(new Rect(1095,85,155,38),"다시 시작")) ResetGame(mode);
         if(Button(new Rect(1095,130,155,38),"메인화면으로")) ResetGame(Mode.Menu);
         if (mode == Mode.Free && !ended) { DrawPracticeSettings(); HandleTargetEdit(sx, sy); }
-        foreach(var e in enemies) if(!e.dead && CanSeeEnemy(e)) { Vector3 screen=cam.WorldToScreenPoint(e.body.transform.position+Vector3.up*2.5f); if(screen.z<=0) continue; float x=screen.x/sx, y=(Screen.height-screen.y)/sy; Box(new Rect(x-36,y,72,6),new Color(.15f,.1f,.1f)); Box(new Rect(x-36,y,72*Mathf.Clamp01(e.hp/e.maxHp),6),red); if(e.boss) GUI.Label(new Rect(x-35,y-42,110,22),"연습 보스",small); }
+        foreach(var e in enemies) if(!e.dead && CanSeeEnemy(e)) { Vector3 screen=cam.WorldToScreenPoint(e.body.transform.position+Vector3.up*2.5f); if(screen.z<=0) continue; float x=screen.x/sx, y=(Screen.height-screen.y)/sy; Box(new Rect(x-36,y,72,6),new Color(.15f,.1f,.1f)); Box(new Rect(x-36,y,72*Mathf.Clamp01(e.hp/e.maxHp),6),red); if (IsPracticeDummy(e))
+            {
+                float remaining = e.hp < e.maxHp ? Mathf.Clamp01(1f - (Time.time - e.lastDamageTime) / DummyHealDelay) : 0f;
+                Box(new Rect(x-36,y+8,72,3),new Color(.09f,.16f,.15f));
+                if (remaining > 0f) Box(new Rect(x-36,y+8,72*remaining,3),mint);
+            }
+            if(e.boss) GUI.Label(new Rect(x-35,y-42,110,22),"연습 보스",small);
+        }
         DrawDummyStats(sx, sy);
         DrawDamageNumbers(sx, sy);
         if (!ended && hoveredSkill >= 0) DrawSkillTooltip(hoveredSkill);
