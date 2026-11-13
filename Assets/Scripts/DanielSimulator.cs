@@ -54,11 +54,14 @@ public class DanielSimulator : MonoBehaviour
     [SerializeField, Range(1, 5)] int startingQLevel = 1;
     [SerializeField, Range(1, 5)] int startingWLevel = 1, startingELevel = 1;
     [SerializeField, Range(1, 3)] int startingRLevel = 1;
-    [SerializeField, Min(0)] float startingAttackPower = 20f;
     int qLevel, wLevel, eLevel, rLevel, qCastLevel;
-    float attackPower, qCastAttackPower, qAttackSpeedBonus;
+    float qCastAttackPower, qAttackSpeedBonus;
+    float attackPower => 32f + 4.7f * (danielLevel - 1);
+    float PlayerDefense => 51f + 2.8f * (danielLevel - 1);
+    float PlayerHealthRegen => 1.53f + .077f * (danielLevel - 1);
+    const float BaseAttackSpeedBonus = .07f;
     float shadowStrikeDamage, shadowCooldown, ultimateTickDamage, ultimateExitDamage, activeUltimateCooldown;
-    float BonusAttackPower => Mathf.Max(0, attackPower - startingAttackPower);
+    float BonusAttackPower => 0f;
     // The stored-damage stat is a percentage: +0.08 percentage points per bonus attack power.
     float MarkStoreRatio => WStore[wLevel - 1] + .0008f * BonusAttackPower;
     float MarkSkillDamage => WDamage[wLevel - 1] + .6f * attackPower;
@@ -96,9 +99,9 @@ public class DanielSimulator : MonoBehaviour
     static readonly string[] SkillKeys = { "Q", "W", "E", "R", "P", "D" };
     static readonly string[] SkillNames = { "그림자 가위", "영감 표식", "그림자 이동", "걸작", "고독한 예술가", "망토와 단검" };
     readonly Texture2D[] skillIcons = new Texture2D[SkillKeys.Length];
-    Texture2D cooldownSweep, danielPortrait;
+    Texture2D cooldownSweep, danielPortrait, hudStats;
     const int PassiveSlot = 4, WeaponSlot = 5;
-    const float SkillSlotX = 425f, SkillSlotY = 607f, SkillSlotSize = 48f, SkillSlotSpacing = 55f;
+    const float SkillSlotX = 425f, SkillSlotY = 607f, SkillSlotSize = 42f, SkillSlotSpacing = 56f;
     const float HudScale = .82f;
     static readonly Rect CombatHud = new Rect(66, 600, 1148, 119);
     static readonly Color HudBackground = new Color(.075f, .109f, .145f, .98f);
@@ -119,7 +122,7 @@ public class DanielSimulator : MonoBehaviour
     }
 
     float lastReceivedDamage, totalReceivedDamage, receivedStreakDamage, firstReceivedTime, lastReceivedTime;
-    const float PlayerMaxHealth = 100f;
+    float PlayerMaxHealth => 920f + 90f * (danielLevel - 1);
     const float DamageNumberLifetime = .85f;
     readonly List<DamageNumber> damageNumbers = new List<DamageNumber>();
     GUIStyle damageNumberStyle, dummyStatsStyle;
@@ -153,7 +156,7 @@ public class DanielSimulator : MonoBehaviour
     static readonly float[] RExitDamage = { 40, 105, 170 };
     static readonly float[] RCooldown = { 70, 60, 50 };
     static readonly float QFanSlope = Mathf.Tan(QHalfAngle * Mathf.Deg2Rad);
-    float AttackSpeedMultiplier => qBuffAttacks > 0 ? 1f + qAttackSpeedBonus : 1f;
+    float AttackSpeedMultiplier => 1f + BaseAttackSpeedBonus + (qBuffAttacks > 0 ? qAttackSpeedBonus : 0f);
     const float UltimateWindupDuration = DanielSkillAudio.UltimateEnterOffset;
     const float UltimateHoldDuration = DanielSkillAudio.UltimateExitOffset - UltimateWindupDuration;
     const float FighterModelScale = .9f;
@@ -177,6 +180,7 @@ public class DanielSimulator : MonoBehaviour
             if (!skillIcons[i]) Debug.LogError($"Skill icon Resources/{resource} could not be loaded.");
         }
         danielPortrait = Resources.Load<Texture2D>("DanielPortrait");
+        hudStats = Resources.Load<Texture2D>("HudStats");
         cooldownSweep = CreateCooldownSweep();
         white = Texture2D.whiteTexture; markerColor=new MaterialPropertyBlock();
         // Soft-edged frame used to tint the screen while stealthed.
@@ -326,7 +330,6 @@ public class DanielSimulator : MonoBehaviour
             wLevel = Mathf.Clamp(startingWLevel, 1, WDamage.Length);
             eLevel = Mathf.Clamp(startingELevel, 1, EDamage.Length);
             rLevel = Mathf.Clamp(startingRLevel, 1, RTickDamage.Length);
-            attackPower = Mathf.Max(0, startingAttackPower);
         }
         if(characterAnimation) characterAnimation.Footstep -= skillAudio.PlayFootstep;
         if(ultimateVfx) ultimateVfx.Stop(); ultimateVfx=null; characterAnimation=null; castFacingTime=0;
@@ -554,7 +557,7 @@ public class DanielSimulator : MonoBehaviour
         UpdateCamera(Time.deltaTime);
         if(mode==Mode.Menu || ended) { if(characterAnimation) characterAnimation.SetMoving(0); return; }
         UpdateHoverOutline();
-        float dt=Time.deltaTime; elapsed+=dt;
+        float dt=Time.deltaTime; elapsed+=dt; health = Mathf.Min(PlayerMaxHealth, health + PlayerHealthRegen * dt);
         foreach (var e in enemies) if (!e.dead) AdvanceMark(e, dt);
         stealthTint=Mathf.MoveTowards(stealthTint,stealth>0?1:0,dt*(stealth>0?6:4)); castFacingTime=Mathf.Max(0,castFacingTime-dt);
         for(int i=0;i<4;i++) cooldown[i]=Mathf.Max(0,cooldown[i]-dt);
@@ -1112,6 +1115,7 @@ public class DanielSimulator : MonoBehaviour
 
     void HurtPlayer(float damage)
     {
+        damage *= 100f / (100f + PlayerDefense);
         health -= damage;
         if (mode == Mode.Free)
         {
@@ -1144,7 +1148,7 @@ public class DanielSimulator : MonoBehaviour
 
     float CurrentMoveSpeed()
     {
-        float speed = 4.4f;
+        float speed = 3.55f;
         if (daggerWindow > DaggerRecastDuration - DaggerHasteDuration) speed *= 1f + DaggerHaste[daggerRank];
         if (IsNight) speed *= 1f + PassiveSpeed[passiveLevel - 1];
         if (IsInFire(player.transform.position)) speed *= .7f;
@@ -1168,14 +1172,14 @@ public class DanielSimulator : MonoBehaviour
         Box(CombatHud, HudBackground);
         Box(new Rect(CombatHud.x, CombatHud.y, CombatHud.width, 1), HudEdge);
 
-        DrawHudStat(76, 609, "공격력", FormatDamage(attackPower), new Color(1f, .81f, .42f));
-        DrawHudStat(151, 609, "스킬 증폭", FormatDamage(skillAmplification), new Color(.81f, .64f, 1f));
-        DrawHudStat(76, 634, "방어 관통", "—", new Color(.93f, .58f, .67f));
-        DrawHudStat(151, 634, "방어력", "0", new Color(.60f, .79f, 1f));
-        DrawHudStat(76, 659, "공격 속도", (AttackSpeedMultiplier / BasicAttackInterval).ToString("0.00"), ink);
-        DrawHudStat(151, 659, "쿨타임 감소", fastPracticeCooldowns && mode == Mode.Free ? "연습" : "0%", ink);
-        DrawHudStat(76, 684, "치명타", "—", new Color(1f, .53f, .53f));
-        DrawHudStat(151, 684, "이동 속도", CurrentMoveSpeed().ToString("0.00"), ink);
+        DrawHudStat(0, "공격력", FormatDamage(attackPower));
+        DrawHudStat(1, "스킬 증폭", FormatDamage(skillAmplification));
+        DrawHudStat(2, "방어 관통", "—");
+        DrawHudStat(3, "방어력", FormatDamage(PlayerDefense));
+        DrawHudStat(4, "공격 속도", (AttackSpeedMultiplier / BasicAttackInterval).ToString("0.00"));
+        DrawHudStat(5, "쿨타임 감소", fastPracticeCooldowns && mode == Mode.Free ? "연습" : "0%");
+        DrawHudStat(6, "치명타", "—");
+        DrawHudStat(7, "이동 속도", CurrentMoveSpeed().ToString("0.00"));
 
         for (int i = 0; i < EquipmentLabels.Length; i++)
         {
@@ -1200,10 +1204,10 @@ public class DanielSimulator : MonoBehaviour
         if (fill.width > 0f) Box(fill, new Color(.52f, .78f, .20f, .98f));
         GUI.Label(healthFrame, $"{FormatDamage(health)} / {FormatDamage(PlayerMaxHealth)}", skillKeyStyle);
 
-        DrawHudSlot(new Rect(744, SkillSlotY, 48, SkillSlotSize), "F");
-        DrawHudSlot(new Rect(706, 676, 86, 28), "◇  —");
-        DrawHudSlot(new Rect(819, 608, 30, 48), "B");
-        DrawHudSlot(new Rect(819, 663, 30, 42), "V");
+        DrawHudSlot(new Rect(SkillSlotPosition(6), SkillSlotY, SkillSlotSize, SkillSlotSize), "F");
+        DrawHudSlot(new Rect(706, 676, 97, 28), "◇  —");
+        DrawHudSlot(new Rect(815, 608, 30, 48), "B");
+        DrawHudSlot(new Rect(815, 663, 30, 42), "V");
 
         for (int i = 0; i < InventoryKeys.Length; i++)
         {
@@ -1212,12 +1216,15 @@ public class DanielSimulator : MonoBehaviour
         }
     }
 
-    void DrawHudStat(float x, float y, string name, string value, Color color)
+    void DrawHudStat(int index, string name, string value)
     {
-        GUI.color = color;
-        GUI.Label(new Rect(x, y - 2, 74, 18), name, skillKeyStyle);
-        GUI.color = Color.white;
-        GUI.Label(new Rect(x, y + 10, 74, 18), value, skillKeyStyle);
+        float x = 76f + (index % 2) * 75f;
+        float y = 609f + (index / 2) * 25f;
+        var icon = new Rect(x, y + 2f, 18f, 18f);
+        if (hudStats) GUI.DrawTextureWithTexCoords(icon, hudStats, new Rect(index / 8f, 0f, 1f / 8f, 1f));
+        GUI.Label(new Rect(x + 20f, y, 50f, 22f), value, skillKeyStyle);
+        if (new Rect(x, y, 70f, 22f).Contains(Event.current.mousePosition))
+            GUI.Label(new Rect(x, CombatHud.y - 28f, 105f, 23f), name, skillTooltipTitle);
     }
 
     void DrawHudSlot(Rect slot, string key)
@@ -1338,7 +1345,7 @@ public class DanielSimulator : MonoBehaviour
         }
     }
 
-    static float SkillSlotPosition(int index) => SkillSlotX + index * SkillSlotSpacing - (index >= PassiveSlot ? 10f : 0f);
+    static float SkillSlotPosition(int index) => SkillSlotX + index * SkillSlotSpacing;
 
     int DrawSkillBar()
     {
@@ -1482,7 +1489,7 @@ public class DanielSimulator : MonoBehaviour
     }
 
     static readonly string[] PracticeTabs = { "다니엘", "일반 적", "보스" };
-    Rect PracticePanelRect => new Rect(960, 182, 290, practiceSettingsOpen ? (practiceTab == 1 ? 385 : practiceTab == 0 ? 383 : 320) : 38);
+    Rect PracticePanelRect => new Rect(960, 182, 290, practiceSettingsOpen ? (practiceTab == 1 ? 385 : practiceTab == 0 ? 358 : 320) : 38);
 
     void DrawPracticeSettings()
     {
@@ -1504,7 +1511,6 @@ public class DanielSimulator : MonoBehaviour
             wLevel = DrawPracticeValue("W 레벨", wLevel, 282, 1, 1, WDamage.Length);
             eLevel = DrawPracticeValue("E 레벨", eLevel, 307, 1, 1, EDamage.Length);
             rLevel = DrawPracticeValue("R 레벨", rLevel, 332, 1, 1, RTickDamage.Length);
-            attackPower = DrawPracticeValue("공격력", attackPower, 357, 5, 0, float.MaxValue);
             weaponMastery = DrawPracticeValue("단검 숙련도", weaponMastery, 382, 1, 0, 15);
             skillAmplification = DrawPracticeValue("스킬 증폭", skillAmplification, 407, 5, 0, float.MaxValue);
             if (Button(new Rect(973, 440, 263, 28), fastPracticeCooldowns ? "쿨타임 초기화 켜짐 · 0.1초" : "쿨타임 초기화 꺼짐"))
@@ -1519,7 +1525,10 @@ public class DanielSimulator : MonoBehaviour
             passiveLevel = DrawPracticeValue("패시브 레벨", passiveLevel, 474, 1, 1, PassiveSight.Length);
             if (Button(new Rect(973, 504, 263, 28), IsNight ? "시간대  ·  밤" : "시간대  ·  낮"))
                 practiceNight = !practiceNight;
-            danielLevel = DrawPracticeValue("다니엘 레벨", danielLevel, 535, 1, 1, 20);
+            float previousMaxHealth = PlayerMaxHealth;
+            danielLevel = DrawPracticeValue("다니엘 레벨", danielLevel, 357, 1, 1, 20);
+            if (PlayerMaxHealth != previousMaxHealth)
+                health = Mathf.Clamp(health / previousMaxHealth * PlayerMaxHealth, 1f, PlayerMaxHealth);
             return;
         }
 
