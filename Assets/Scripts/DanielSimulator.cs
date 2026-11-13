@@ -6,6 +6,13 @@ using UnityEngine.InputSystem;
 public class DanielSimulator : MonoBehaviour
 {
     enum Mode { Menu, Puzzle1, Puzzle2, Puzzle3, Free }
+    sealed class EnemySettings
+    {
+        public int Hp, Defense, Attack = 25;
+        public float Speed = 1.3f;
+        public bool Moves, Attacks;
+        public EnemySettings(int hp) { Hp = hp; }
+    }
     class Enemy {
         public GameObject body, warning, markVisual;
         public DanielSkillVfx markSight;
@@ -18,7 +25,7 @@ public class DanielSimulator : MonoBehaviour
         public DanielSkillVfx ultimateLink;
         public bool dead, boss;
     }
-    class Shot { public GameObject body; public Vector3 velocity; public float life = 4; }
+    class Shot { public GameObject body; public Vector3 velocity; public float life = 4, damage; }
     Mode mode = Mode.Menu;
     readonly List<Enemy> enemies = new List<Enemy>();
     readonly List<Shot> shots = new List<Shot>();
@@ -56,7 +63,11 @@ public class DanielSimulator : MonoBehaviour
     static readonly float[] DaggerCooldown = { 30, 25, 20 };
     const float DaggerRange = 3f, DaggerHasteDuration = 1f, DaggerRecastDuration = 3f;
     int weaponMastery = 5, daggerRank;
-    int practiceTargetHp = 160, practiceBossHp = 1000;
+    readonly EnemySettings practiceTarget = new EnemySettings(160), practiceBoss = new EnemySettings(1000);
+    int practiceTab;
+    enum TargetEdit { None, PlaceEnemy, PlaceBoss, Remove }
+    TargetEdit targetEdit;
+    Texture2D editCursor;
     bool practiceSettingsOpen = true, practiceBossUltimate;
     float skillAmplification, daggerWindow, daggerCooldown;
     static readonly string[] SkillKeys = { "Q", "W", "E", "R", "D" };
@@ -268,6 +279,7 @@ public class DanielSimulator : MonoBehaviour
     void ResetGame(Mode next) {
         skillAudio.StopAll();
         damageNumbers.Clear();
+        SetTargetEdit(TargetEdit.None);
         if (next != Mode.Free || mode != Mode.Free)
         {
             qLevel = Mathf.Clamp(startingQLevel, 1, QDamage.Length);
@@ -316,13 +328,13 @@ public class DanielSimulator : MonoBehaviour
             leftLeg=rightLeg=leftArm=rightArm=null;
         } else { Debug.LogError("Y Bot FBX could not be loaded from Resources/Characters/Y Bot."); BuildDaniel(player.transform); }
         shadow=Shape(PrimitiveType.Cylinder,"Player marker",destination+Vector3.up*.035f,new Vector3(.78f,.025f,.78f),new Color(.29f,.9f,.68f),arena.transform);
-        if(next!=Mode.Menu) { AddEnemy(new Vector3(4,0,2),0); if(next==Mode.Puzzle3 || next==Mode.Free) AddEnemy(new Vector3(7,0,-3),1.1f); }
+        if(next!=Mode.Menu) { AddEnemy(new Vector3(4,0,2),0); if(next==Mode.Puzzle3) AddEnemy(new Vector3(7,0,-3),1.1f); }
     }
     void AddEnemy(Vector3 position, float offset, bool boss = false) {
         Enemy e = new Enemy { boss = boss, timer = 1.4f + offset };
         e.body = new GameObject(boss ? "Training boss" : "Training target");
         e.body.transform.position = position;
-        if (mode == Mode.Free) e.hp = e.maxHp = boss ? practiceBossHp : practiceTargetHp;
+        if (mode == Mode.Free) e.hp = e.maxHp = (boss ? practiceBoss : practiceTarget).Hp;
         else if (boss) e.hp = e.maxHp = 1000;
         Transform savedLL=leftLeg, savedRL=rightLeg, savedLA=leftArm, savedRA=rightArm;
         BuildFighter(e.body.transform, false); leftLeg=savedLL; rightLeg=savedRL; leftArm=savedLA; rightArm=savedRA;
@@ -446,7 +458,7 @@ public class DanielSimulator : MonoBehaviour
             }
             if(Keyboard.current.qKey.wasPressedThisFrame) Cast(0); if(Keyboard.current.wKey.wasPressedThisFrame) Cast(1); if(Keyboard.current.eKey.wasPressedThisFrame) Cast(2); if(Keyboard.current.rKey.wasPressedThisFrame) Cast(3);
             if(Keyboard.current.dKey.wasPressedThisFrame) CastDagger();
-            if(Keyboard.current.escapeKey.wasPressedThisFrame) { ResetGame(Mode.Menu); return; }
+            if(Keyboard.current.escapeKey.wasPressedThisFrame) { if (targetEdit != TargetEdit.None) SetTargetEdit(TargetEdit.None); else { ResetGame(Mode.Menu); return; } }
         }
         // Stealth presentation: smoke veil while hidden, a reveal ring when it ends on its own or is broken by a skill.
         if(stealth>0 && dashTime<=0 && !veilVfx) { veilVfx=DanielSkillVfx.CreateVeil(player.transform); quietReveal=false; }
@@ -482,14 +494,13 @@ public class DanielSimulator : MonoBehaviour
         }
         for(int i=shots.Count-1;i>=0;i--) {
             Shot s=shots[i]; s.body.transform.position+=s.velocity*dt; s.life-=dt;
-            if(Vector3.Distance(s.body.transform.position,player.transform.position+Vector3.up*.55f)<.75f && invulnerable<=0 && !IsUntargetable) { health-=25; ShowDamage(player.transform.position, 25f, DamageType.Skill); hits++; invulnerable=.6f; s.life=0; Show("피격! 진입하기 전에 투사체를 피하세요."); }
+            if(s.damage>0 && Vector3.Distance(s.body.transform.position,player.transform.position+Vector3.up*.55f)<.75f && invulnerable<=0 && !IsUntargetable) { health-=s.damage; ShowDamage(player.transform.position, s.damage, DamageType.Skill); hits++; invulnerable=.6f; s.life=0; Show("피격! 진입하기 전에 투사체를 피하세요."); }
             if(s.life<=0 || Mathf.Abs(s.body.transform.position.x)>13 || Mathf.Abs(s.body.transform.position.z)>10) { if(s.life>0) dodged++; Destroy(s.body); shots.RemoveAt(i); }
         }
-        if(health<=0) Finish(false);
+        if(health<=0) { SetTargetEdit(TargetEdit.None); Finish(false); }
         else if(!IsUntargetable && mode==Mode.Puzzle1 && kills>=1) Finish(hits<=2);
         else if(!IsUntargetable && mode==Mode.Puzzle2 && kills>=1) Finish(dodged>=2);
         else if(!IsUntargetable && mode==Mode.Puzzle3 && kills>=2) Finish(stealthUses>=1 && hits<=3);
-        else if(mode==Mode.Free && kills>=enemies.Count && shots.Count==0) { AddEnemy(new Vector3(Random.Range(3f,9f),0,Random.Range(-6f,6f)),0); }
     }
     // Quarter-view chase camera: locked to the player by default, Y frees it for edge panning.
     void UpdateCamera(float dt) {
@@ -542,8 +553,12 @@ public class DanielSimulator : MonoBehaviour
         if(e.dead) return;
         Vector3 face = player.transform.position - e.body.transform.position;
         face.y = 0;
-        bool seesPlayer = e.visionDebuff <= 0 || face.sqrMagnitude <= MarkSightRadius * MarkSightRadius;
-        if (seesPlayer && face.sqrMagnitude > .01f) e.body.transform.rotation = Quaternion.LookRotation(face);
+        var settings = mode == Mode.Free ? (e.boss ? practiceBoss : practiceTarget) : null;
+        bool moves = settings == null || settings.Moves;
+        bool attacks = settings == null || settings.Attacks;
+        bool seesPlayer = stealth <= 0 && !IsUntargetable &&
+            (e.visionDebuff <= 0 || face.sqrMagnitude <= MarkSightRadius * MarkSightRadius);
+        if ((moves || attacks) && seesPlayer && face.sqrMagnitude > .01f) e.body.transform.rotation = Quaternion.LookRotation(face);
         e.silence = Mathf.Max(0, e.silence - dt);
         e.slow = Mathf.Max(0, e.slow - dt);
         e.daggerSlowTime = Mathf.Max(0, e.daggerSlowTime - dt);
@@ -551,19 +566,25 @@ public class DanielSimulator : MonoBehaviour
         if (e.slow <= 0) e.slowFactor = 1;
         e.timer -= dt;
         e.recentDamage = Mathf.Max(0, e.recentDamage - dt);
-        if(e.windup<0 && seesPlayer && stealth<=0 && !IsUntargetable) {
+        if(moves && e.windup<0 && seesPlayer) {
             Vector3 away=e.body.transform.position-player.transform.position; away.y=0;
             if(away.magnitude<4.5f && away.sqrMagnitude>.01f) {
                 float movementFactor = e.markSlow > 0 ? .5f : e.slowFactor;
                 if (e.daggerSlowTime > 0) movementFactor = Mathf.Min(movementFactor, e.daggerSlowFactor);
-                Vector3 next=e.body.transform.position+away.normalized*1.3f*movementFactor*dt;
+                Vector3 next=e.body.transform.position+away.normalized*(settings?.Speed ?? 1.3f)*movementFactor*dt;
                 next.x=Mathf.Clamp(next.x,-11.5f,11.5f); next.z=Mathf.Clamp(next.z,-8.5f,8.5f); e.body.transform.position=next;
             }
+        }
+        if (!attacks)
+        {
+            if (e.windup >= 0) e.warning.SetActive(false);
+            e.windup = -1;
+            return;
         }
         if(e.silence>0) return;
         if(e.windup>=0) {
             e.windup-=dt;
-            if(e.windup<=0) { e.warning.SetActive(false); var s=new Shot(); s.body=Shape(PrimitiveType.Sphere,"Projectile",e.body.transform.position+Vector3.up*.55f,new Vector3(.55f,.55f,.55f),new Color(1,.35f,.20f),arena.transform); s.velocity=e.direction*8; shots.Add(s); e.windup=-1; e.timer=e.slow>0?2.8f:1.8f; }
+            if(e.windup<=0) { e.warning.SetActive(false); var s=new Shot(); s.body=Shape(PrimitiveType.Sphere,"Projectile",e.body.transform.position+Vector3.up*.55f,new Vector3(.55f,.55f,.55f),new Color(1,.35f,.20f),arena.transform); s.velocity=e.direction*8; s.damage=settings?.Attack ?? 25; shots.Add(s); e.windup=-1; e.timer=e.slow>0?2.8f:1.8f; }
         } else if(e.timer<=0 && !IsUntargetable && seesPlayer) {
             Vector3 aim=player.transform.position-e.body.transform.position; aim.y=0; e.direction=aim.sqrMagnitude>.01f?aim.normalized:Vector3.forward; e.windup=.85f;
             e.warning.transform.position=e.body.transform.position+e.direction*6+Vector3.up*.025f; e.warning.transform.rotation=Quaternion.LookRotation(e.direction); e.warning.transform.localScale=new Vector3(.75f,.025f,12); e.warning.SetActive(true);
@@ -579,16 +600,18 @@ public class DanielSimulator : MonoBehaviour
         if (e == null || e.dead) return;
         e.visionDebuff = 0;
         Vector3 position = e.body.transform.position;
-        float skillDamage = extraSkillDamage + (type == DamageType.Skill ? amount : 0f);
-        float basicDamage = type == DamageType.Basic ? amount : 0f;
-        float damage = amount + extraSkillDamage + trueDamage;
+        int defense = mode == Mode.Free ? (e.boss ? practiceBoss : practiceTarget).Defense : 0;
+        float multiplier = 100f / (100f + defense);
+        float skillDamage = (extraSkillDamage + (type == DamageType.Skill ? amount : 0f)) * multiplier;
+        float basicDamage = type == DamageType.Basic ? amount * multiplier : 0f;
+        float damage = basicDamage + skillDamage + trueDamage;
         float markBurstDamage = 0f;
         if (e.mark > WReadyTime)
             e.storedDamage += damage * e.markStoreRatio;
         else if (e.mark > 0 && canDetonateMark)
         {
-            // The arena has no defense stat. Both the stored true damage and skill damage go directly to HP.
-            markBurstDamage = e.storedDamage + e.markSkillDamage;
+            // Only the skill component of the mark explosion is reduced by defense.
+            markBurstDamage = e.storedDamage + e.markSkillDamage * multiplier;
             ClearMark(e);
             damage += markBurstDamage;
             DanielSkillVfx.MarkBurst(e.body.transform.position);
@@ -848,8 +871,9 @@ public class DanielSimulator : MonoBehaviour
             if(Button(new Rect(60,240,380,65),"01   진입의 순간     /     2회 이하 피격으로 처치")) ResetGame(Mode.Puzzle1);
             if(Button(new Rect(60,316,380,65),"02   먼저 피하기     /     투사체 2회 회피 후 처치")) ResetGame(Mode.Puzzle2);
             if(Button(new Rect(60,392,380,65),"03   위험한 암살     /     은신을 사용해 두 적 처치")) ResetGame(Mode.Puzzle3);
-            if(Button(new Rect(60,468,380,65),"∞   자유 연습     /     계속 등장하는 표적")) ResetGame(Mode.Free);
-            GUI.Label(new Rect(60,558,365,65),"우클릭 이동 · 마우스 방향 조준\n우클릭 적 공격 · Q 가위 · W 표식 · E 은신 · R 궁극기 · D 단검",small);
+            if(Button(new Rect(60,468,380,65),"∞   자유 연습")) ResetGame(Mode.Free);
+            if (Button(new Rect(60,544,380,40),"게임 종료")) QuitGame();
+            GUI.Label(new Rect(60,590,365,65),"우클릭 이동 · 마우스 방향 조준\n우클릭 적 공격 · Q 가위 · W 표식 · E 은신 · R 궁극기 · D 단검",small);
             GUI.Label(new Rect(840,600,400,50),"관찰  →  회피  →  진입  →  마무리",label); return;
         }
         if(stealthTint>.01f && !ended) {
@@ -859,19 +883,19 @@ public class DanielSimulator : MonoBehaviour
             GUI.color=Color.white;
         }
         string title=mode==Mode.Puzzle1?"01  진입의 순간":mode==Mode.Puzzle2?"02  먼저 피하기":mode==Mode.Puzzle3?"03  위험한 암살":"∞  자유 연습";
-        string goal=mode==Mode.Puzzle1?"2회 이하 피격으로 표적 처치":mode==Mode.Puzzle2?"투사체 2회 회피 후 표적 처치":mode==Mode.Puzzle3?"은신 사용 후 3회 이하 피격으로 두 표적 처치":"표적을 처치하며 자유롭게 연습하세요";
+        string goal=mode==Mode.Puzzle1?"2회 이하 피격으로 표적 처치":mode==Mode.Puzzle2?"투사체 2회 회피 후 표적 처치":mode==Mode.Puzzle3?"은신 사용 후 3회 이하 피격으로 두 표적 처치":"연습 설정에서 적을 배치할 수 있습니다.";
         Box(new Rect(25,84,370,116),new Color(.025f,.045f,.055f,.91f)); GUI.Label(new Rect(43,96,340,30),title,label); GUI.Label(new Rect(43,126,330,24),goal,small); GUI.Label(new Rect(43,155,335,30),"피격 " + hits + "   ·   회피 " + dodged + "   ·   처치 " + kills, label);
         Box(new Rect(25,211,230,62),new Color(.025f,.045f,.055f,.91f)); GUI.Label(new Rect(43,219,200,24),"체력  " + Mathf.Max(0,health).ToString("0") + " / 100",small); Box(new Rect(43,248,190,8),new Color(.18f,.22f,.23f)); Box(new Rect(43,248,190*Mathf.Max(0,health)/100,8),mint);
         if(shadowBuff>0) GUI.Label(new Rect(270,220,280,30),"그림자 평타 " + shadowBuff.ToString("0.0") + "초" + (stealth>0?" · 은신":""),label);
         int hoveredSkill = DrawSkillBar();
         GUI.Label(new Rect(26,658,362,44),"우클릭 이동·공격 · A 공격 · S 정지\nY 시점 고정/해제 · Space 내 캐릭터 · 휠 확대/축소 · ESC 메뉴",small);
         if(Button(new Rect(1095,85,155,38),"다시 시작")) ResetGame(mode);
-        if(Button(new Rect(1095,130,155,38),"메뉴로")) ResetGame(Mode.Menu);
-        if (mode == Mode.Free && !ended) DrawPracticeSettings();
+        if(Button(new Rect(1095,130,155,38),"메인화면으로")) ResetGame(Mode.Menu);
+        if (mode == Mode.Free && !ended) { DrawPracticeSettings(); HandleTargetEdit(sx, sy); }
         foreach(var e in enemies) if(!e.dead && CanSeeEnemy(e)) { Vector3 screen=cam.WorldToScreenPoint(e.body.transform.position+Vector3.up*2.5f); if(screen.z<=0) continue; float x=screen.x/sx, y=(Screen.height-screen.y)/sy; Box(new Rect(x-36,y,72,6),new Color(.15f,.1f,.1f)); Box(new Rect(x-36,y,72*Mathf.Clamp01(e.hp/e.maxHp),6),red); if(e.boss) GUI.Label(new Rect(x-35,y-42,110,22),"연습 보스",small); }
         DrawDamageNumbers(sx, sy);
         if (!ended && hoveredSkill >= 0) DrawSkillTooltip(hoveredSkill);
-        if(ended) { Box(new Rect(0,64,1280,656),new Color(0,0,0,.68f)); Box(new Rect(400,220,480,260),new Color(.04f,.075f,.08f,.98f)); GUI.Label(new Rect(430,246,420,45),won?"훈련 성공":"훈련 종료",heading); GUI.Label(new Rect(430,300,400,50),won?"좋은 진입이었습니다.":"목표 조건을 확인하고 다시 도전하세요.",label); GUI.Label(new Rect(430,348,400,30),"피격 " + hits + "   ·   회피 " + dodged + "   ·   처치 " + kills + "   ·   " + elapsed.ToString("0.0") + "초",small); if(Button(new Rect(430,399,185,48),"다시 도전")) ResetGame(mode); if(Button(new Rect(630,399,185,48),"메뉴로")) ResetGame(Mode.Menu); }
+        if(ended) { Box(new Rect(0,64,1280,656),new Color(0,0,0,.68f)); Box(new Rect(400,220,480,260),new Color(.04f,.075f,.08f,.98f)); GUI.Label(new Rect(430,246,420,45),won?"훈련 성공":"훈련 종료",heading); GUI.Label(new Rect(430,300,400,50),won?"좋은 진입이었습니다.":"목표 조건을 확인하고 다시 도전하세요.",label); GUI.Label(new Rect(430,348,400,30),"피격 " + hits + "   ·   회피 " + dodged + "   ·   처치 " + kills + "   ·   " + elapsed.ToString("0.0") + "초",small); if(Button(new Rect(430,399,185,48),"다시 도전")) ResetGame(mode); if(Button(new Rect(630,399,185,48),"메인화면으로")) ResetGame(Mode.Menu); }
     }
 
     void ShowDamage(Vector3 position, float amount, DamageType type)
@@ -952,6 +976,11 @@ public class DanielSimulator : MonoBehaviour
     void OnDestroy()
     {
         if (cooldownSweep) Destroy(cooldownSweep);
+        if (editCursor)
+        {
+            SetTargetEdit(TargetEdit.None);
+            Destroy(editCursor);
+        }
     }
 
     int DrawSkillBar()
@@ -1046,45 +1075,165 @@ public class DanielSimulator : MonoBehaviour
         GUI.Label(new Rect(x + 12, y + 34, width - 24, bodyHeight), details, label);
     }
 
+    static void QuitGame()
+    {
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
+    }
+
+    static readonly string[] PracticeTabs = { "다니엘", "일반 적", "보스" };
+    Rect PracticePanelRect => new Rect(960, 182, 290, practiceSettingsOpen ? 354 : 38);
+
     void DrawPracticeSettings()
     {
-        bool bossAlive = enemies.Exists(e => e.boss && !e.dead);
-        float panelHeight = practiceSettingsOpen ? (bossAlive ? 298 : 334) : 38;
-        Box(new Rect(960, 182, 290, panelHeight), new Color(.025f, .045f, .055f, .91f));
+        Box(PracticePanelRect, new Color(.025f, .045f, .055f, .91f));
         if (Button(new Rect(973, 187, 263, 28), practiceSettingsOpen ? "연습 설정  ▴" : "연습 설정  ▾"))
             practiceSettingsOpen = !practiceSettingsOpen;
         if (!practiceSettingsOpen) return;
 
-        qLevel = DrawPracticeValue("Q 레벨", qLevel, 223, 1, 1, QDamage.Length);
-        wLevel = DrawPracticeValue("W 레벨", wLevel, 248, 1, 1, WDamage.Length);
-        eLevel = DrawPracticeValue("E 레벨", eLevel, 273, 1, 1, EDamage.Length);
-        rLevel = DrawPracticeValue("R 레벨", rLevel, 298, 1, 1, RTickDamage.Length);
-        attackPower = DrawPracticeValue("공격력", attackPower, 323, 5, 0, float.MaxValue);
-        weaponMastery = DrawPracticeValue("단검 숙련도", weaponMastery, 348, 1, 0, 15);
-        skillAmplification = DrawPracticeValue("스킬 증폭", skillAmplification, 373, 5, 0, float.MaxValue);
+        for (int i = 0; i < PracticeTabs.Length; i++)
+        {
+            var tab = new Rect(973 + i * 89, 221, 85, 28);
+            if (Button(tab, PracticeTabs[i])) practiceTab = i;
+            if (practiceTab == i) Box(new Rect(tab.x, tab.yMax - 2, tab.width, 2), mint);
+        }
 
-        int targetHp = DrawPracticeValue("표적 최대 체력", practiceTargetHp, 398, 50, 10, 1000000);
-        int bossHp = DrawPracticeValue("보스 최대 체력", practiceBossHp, 423, 100, 100, 1000000);
-        if (targetHp != practiceTargetHp) SetPracticeEnemyHp(false, targetHp);
-        if (bossHp != practiceBossHp) SetPracticeEnemyHp(true, bossHp);
+        if (practiceTab == 0)
+        {
+            qLevel = DrawPracticeValue("Q 레벨", qLevel, 257, 1, 1, QDamage.Length);
+            wLevel = DrawPracticeValue("W 레벨", wLevel, 282, 1, 1, WDamage.Length);
+            eLevel = DrawPracticeValue("E 레벨", eLevel, 307, 1, 1, EDamage.Length);
+            rLevel = DrawPracticeValue("R 레벨", rLevel, 332, 1, 1, RTickDamage.Length);
+            attackPower = DrawPracticeValue("공격력", attackPower, 357, 5, 0, float.MaxValue);
+            weaponMastery = DrawPracticeValue("단검 숙련도", weaponMastery, 382, 1, 0, 15);
+            skillAmplification = DrawPracticeValue("스킬 증폭", skillAmplification, 407, 5, 0, float.MaxValue);
+            if (Button(new Rect(973, 500, 263, 28), "메인화면으로")) ResetGame(Mode.Menu);
+            return;
+        }
 
-        if (Button(new Rect(973, 453, 263, 26), practiceBossUltimate ? "보스 대상 R 허용" : "보스 대상 R 금지"))
+        bool boss = practiceTab == 2;
+        var settings = boss ? practiceBoss : practiceTarget;
+        int hp = DrawPracticeValue("최대 체력", settings.Hp, 257, boss ? 100 : 50, boss ? 100 : 10, 1000000);
+        if (hp != settings.Hp)
+        {
+            settings.Hp = hp;
+            foreach (var enemy in enemies)
+            {
+                if (enemy.dead || enemy.boss != boss) continue;
+                enemy.hp = Mathf.Clamp01(enemy.hp / enemy.maxHp) * hp;
+                enemy.maxHp = hp;
+            }
+        }
+        settings.Defense = DrawPracticeValue("방어력", settings.Defense, 282, 5, 0, 10000);
+        settings.Attack = DrawPracticeValue("공격력", settings.Attack, 307, 5, 0, 10000);
+        settings.Speed = DrawPracticeValue("이동 속도", settings.Speed, 332, .1f, 0, 20f);
+        if (Button(new Rect(973, 363, 129, 28), settings.Attacks ? "공격 켜짐" : "공격 꺼짐"))
+            settings.Attacks = !settings.Attacks;
+        if (Button(new Rect(1107, 363, 129, 28), settings.Moves ? "이동 켜짐" : "이동 꺼짐"))
+            settings.Moves = !settings.Moves;
+        if (boss && Button(new Rect(973, 396, 263, 28), practiceBossUltimate ? "보스 대상 R 허용" : "보스 대상 R 금지"))
             practiceBossUltimate = !practiceBossUltimate;
-        if (!bossAlive && Button(new Rect(973, 485, 263, 26), "연습 보스 추가"))
-            AddEnemy(new Vector3(3, 0, -5), 1f, boss: true);
+        TargetEdit place = boss ? TargetEdit.PlaceBoss : TargetEdit.PlaceEnemy;
+        DrawTargetEditButton(431, place, boss ? "보스 배치" : "일반 적 배치");
+        DrawTargetEditButton(463, TargetEdit.Remove, "적 삭제");
+        if (Button(new Rect(973, 500, 263, 28), "메인화면으로")) ResetGame(Mode.Menu);
     }
 
-    void SetPracticeEnemyHp(bool boss, int maxHp)
+    void DrawTargetEditButton(float y, TargetEdit edit, string caption)
     {
-        if (boss) practiceBossHp = maxHp;
-        else practiceTargetHp = maxHp;
+        bool selected = targetEdit == edit;
+        if (Button(new Rect(973, y, 263, 28), selected ? caption + " 취소" : caption))
+            SetTargetEdit(selected ? TargetEdit.None : edit);
+    }
 
-        foreach (var enemy in enemies)
+    void SetTargetEdit(TargetEdit edit)
+    {
+        if (targetEdit == edit) return;
+        targetEdit = edit;
+        if (edit == TargetEdit.None)
         {
-            if (enemy.dead || enemy.boss != boss) continue;
-            enemy.hp = Mathf.Clamp01(enemy.hp / enemy.maxHp) * maxHp;
-            enemy.maxHp = maxHp;
+            Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
+            return;
         }
+
+        if (!editCursor)
+            editCursor = new Texture2D(32, 32, TextureFormat.RGBA32, false);
+        var pixels = new Color32[32 * 32];
+        Color32 ink = edit == TargetEdit.Remove ? new Color32(255, 95, 95, 255) : new Color32(114, 255, 202, 255);
+        for (int y = 0; y < 32; y++)
+        for (int x = 0; x < 32; x++)
+        {
+            int dx = Mathf.Abs(x - 16), dy = Mathf.Abs(y - 15);
+            int axis = edit == TargetEdit.Remove ? Mathf.Abs(dx - dy) : Mathf.Min(dx, dy);
+            int distance = Mathf.Max(dx, dy);
+            if (axis <= 2 && distance <= 13) pixels[y * 32 + x] = new Color32(18, 24, 29, 255);
+            if (axis <= 1 && distance <= 11) pixels[y * 32 + x] = ink;
+        }
+        editCursor.SetPixels32(pixels);
+        editCursor.Apply();
+        Cursor.SetCursor(editCursor, new Vector2(16, 16), CursorMode.ForceSoftware);
+    }
+
+    void HandleTargetEdit(float sx, float sy)
+    {
+        if (targetEdit == TargetEdit.None) return;
+
+        Event input = Event.current;
+        Vector2 point = input.mousePosition;
+        bool overHud = point.y < 64 || point.y >= 628 || PracticePanelRect.Contains(point) ||
+            new Rect(1095, 85, 155, 83).Contains(point) || new Rect(25, 84, 370, 189).Contains(point);
+        if (input.type == EventType.MouseDown && input.button == 0 && !overHud)
+        {
+            if (targetEdit == TargetEdit.Remove)
+            {
+                Enemy target = EnemyAtCursor();
+                if (target != null && target != ultimateTarget)
+                {
+                    RemovePracticeEnemy(target);
+                    SetTargetEdit(TargetEdit.None);
+                }
+            }
+            else
+            {
+                var screenPoint = new Vector2(point.x * sx, Screen.height - point.y * sy);
+                Ray ray = cam.ScreenPointToRay(screenPoint);
+                if (new Plane(Vector3.up, Vector3.zero).Raycast(ray, out float distance))
+                {
+                    Vector3 position = ray.GetPoint(distance);
+                    if (Mathf.Abs(position.x) <= 11.5f && Mathf.Abs(position.z) <= 8.5f)
+                    {
+                        AddEnemy(position, 0f, boss: targetEdit == TargetEdit.PlaceBoss);
+                        SetTargetEdit(TargetEdit.None);
+                    }
+                }
+            }
+            input.Use();
+        }
+        if (targetEdit == TargetEdit.None) return;
+
+        string hint = targetEdit == TargetEdit.Remove ? "적 좌클릭으로 삭제 · ESC 취소" :
+            targetEdit == TargetEdit.PlaceBoss ? "맵 좌클릭으로 보스 배치 · ESC 취소" : "맵 좌클릭으로 일반 적 배치 · ESC 취소";
+        Box(new Rect(460, 77, 360, 32), new Color(.025f, .045f, .055f, .91f));
+        GUI.Label(new Rect(468, 79, 344, 28), hint, centered);
+    }
+
+    void RemovePracticeEnemy(Enemy target)
+    {
+        if (attackTarget == target)
+        {
+            attackTarget = null;
+            destination = player.transform.position;
+        }
+        if (target.mark > 0) ClearMark(target);
+        if (target.ultimateLink) target.ultimateLink.Stop();
+        target.body.SetActive(false);
+        target.warning.SetActive(false);
+        Destroy(target.body);
+        Destroy(target.warning);
+        enemies.Remove(target);
     }
 
     int DrawPracticeValue(string name, int value, float y, int step, int min, int max)
