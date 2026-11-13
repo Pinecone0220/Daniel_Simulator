@@ -21,6 +21,7 @@ public class DanielSimulator : MonoBehaviour
         public readonly List<GameObject> outline = new List<GameObject>(); public bool outlined;
         public Vector3 direction;
         public float daggerSlowTime, daggerSlowFactor;
+        public float lastDamage, totalDamage, firstDamageTime, lastDamageTime;
         public float hp = 160, timer, windup = -1, slow, slowFactor=1, markSlow, mark, storedDamage, recentDamage, visionDebuff, silence;
         public DanielSkillVfx ultimateLink;
         public bool dead, boss;
@@ -87,7 +88,7 @@ public class DanielSimulator : MonoBehaviour
 
     const float DamageNumberLifetime = .85f;
     readonly List<DamageNumber> damageNumbers = new List<DamageNumber>();
-    GUIStyle damageNumberStyle;
+    GUIStyle damageNumberStyle, dummyStatsStyle;
     GUIStyle skillKeyStyle, skillTimerStyle, skillTimerShadow, skillTooltipTitle;
     float[] cooldown = new float[4];
     int hits, dodged, kills, stealthUses;
@@ -623,7 +624,17 @@ public class DanielSimulator : MonoBehaviour
         }
         if (damage > 0) e.recentDamage = 4;
         e.hp -= damage;
-        if (IsPracticeDummy(e)) e.hp = Mathf.Max(1f, e.hp);
+        if (IsPracticeDummy(e))
+        {
+            e.hp = Mathf.Max(1f, e.hp);
+            if (damage > 0f)
+            {
+                if (e.totalDamage == 0f) e.firstDamageTime = Time.time;
+                e.lastDamageTime = Time.time;
+                e.lastDamage = damage;
+                e.totalDamage += damage;
+            }
+        }
         ShowDamage(position, basicDamage, DamageType.Basic);
         ShowDamage(position, skillDamage, DamageType.Skill);
         ShowDamage(position, trueDamage, DamageType.True);
@@ -857,6 +868,7 @@ public class DanielSimulator : MonoBehaviour
         small=new GUIStyle(label){fontSize=13,normal={textColor=muted}};
         heading=new GUIStyle(label){fontSize=29,fontStyle=FontStyle.Bold,normal={textColor=Color.white}};
         centered=new GUIStyle(label){alignment=TextAnchor.MiddleCenter};
+        dummyStatsStyle = new GUIStyle(centered) { fontSize = 13, normal = { textColor = Color.white } };
         damageNumberStyle = new GUIStyle(centered) { fontSize = 24, fontStyle = FontStyle.Bold, wordWrap = false };
         skillKeyStyle = new GUIStyle(centered) { fontSize = 13, fontStyle = FontStyle.Bold, normal = { textColor = Color.white } };
         skillTimerStyle = new GUIStyle(skillKeyStyle) { fontSize = 23 };
@@ -897,6 +909,7 @@ public class DanielSimulator : MonoBehaviour
         if(Button(new Rect(1095,130,155,38),"메인화면으로")) ResetGame(Mode.Menu);
         if (mode == Mode.Free && !ended) { DrawPracticeSettings(); HandleTargetEdit(sx, sy); }
         foreach(var e in enemies) if(!e.dead && CanSeeEnemy(e)) { Vector3 screen=cam.WorldToScreenPoint(e.body.transform.position+Vector3.up*2.5f); if(screen.z<=0) continue; float x=screen.x/sx, y=(Screen.height-screen.y)/sy; Box(new Rect(x-36,y,72,6),new Color(.15f,.1f,.1f)); Box(new Rect(x-36,y,72*Mathf.Clamp01(e.hp/e.maxHp),6),red); if(e.boss) GUI.Label(new Rect(x-35,y-42,110,22),"연습 보스",small); }
+        DrawDummyStats(sx, sy);
         DrawDamageNumbers(sx, sy);
         if (!ended && hoveredSkill >= 0) DrawSkillTooltip(hoveredSkill);
         if(ended) { Box(new Rect(0,64,1280,656),new Color(0,0,0,.68f)); Box(new Rect(400,220,480,260),new Color(.04f,.075f,.08f,.98f)); GUI.Label(new Rect(430,246,420,45),won?"훈련 성공":"훈련 종료",heading); GUI.Label(new Rect(430,300,400,50),won?"좋은 진입이었습니다.":"목표 조건을 확인하고 다시 도전하세요.",label); GUI.Label(new Rect(430,348,400,30),"피격 " + hits + "   ·   회피 " + dodged + "   ·   처치 " + kills + "   ·   " + elapsed.ToString("0.0") + "초",small); if(Button(new Rect(430,399,185,48),"다시 도전")) ResetGame(mode); if(Button(new Rect(630,399,185,48),"메인화면으로")) ResetGame(Mode.Menu); }
@@ -919,11 +932,32 @@ public class DanielSimulator : MonoBehaviour
             Position = position,
             Offset = new Vector2(horizontal, -23f * (nearby / 2) - (nearby % 2 == 1 ? 12f : 0f)),
             Started = now,
-            Text = System.Math.Round(amount, System.MidpointRounding.AwayFromZero).ToString("0"),
+            Text = FormatDamage(amount),
             Color = type == DamageType.True ? Color.white :
                 type == DamageType.Basic ? new Color(1f, .31f, .31f) : new Color(.78f, .43f, 1f)
         });
     }
+
+    void DrawDummyStats(float sx, float sy)
+    {
+        if (mode != Mode.Free || ended || Event.current.type != EventType.Repaint) return;
+
+        foreach (var enemy in enemies)
+        {
+            if (enemy.dead || !IsPracticeDummy(enemy) || !CanSeeEnemy(enemy)) continue;
+            Vector3 screen = cam.WorldToScreenPoint(enemy.body.transform.position);
+            if (screen.z <= 0f) continue;
+
+            float duration = Mathf.Max(1f, enemy.lastDamageTime - enemy.firstDamageTime);
+            float dps = enemy.totalDamage / duration;
+            var rect = new Rect(screen.x / sx - 118f, (Screen.height - screen.y) / sy + 12f, 236f, 25f);
+            Box(rect, new Color(.025f, .045f, .055f, .91f));
+            GUI.Label(rect, $"직전 {FormatDamage(enemy.lastDamage)}  ·  총합 {FormatDamage(enemy.totalDamage)}  ·  DPS {FormatDamage(dps)}", dummyStatsStyle);
+        }
+    }
+
+    static string FormatDamage(float amount) =>
+        System.Math.Round(amount, System.MidpointRounding.AwayFromZero).ToString("0");
 
     void DrawDamageNumbers(float sx, float sy)
     {
