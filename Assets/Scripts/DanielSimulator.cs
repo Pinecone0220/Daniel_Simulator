@@ -601,13 +601,13 @@ public class DanielSimulator : MonoBehaviour
         {
             player.transform.position = ultimateTarget.body.transform.position;
             float castElapsed = UltimateWindupDuration + UltimateHoldDuration - ultimateTime;
-            // Apply every due tick even if one frame crosses more than one timestamp.
+            // The cast keeps its sound rhythm after a kill. Only living targets take damage.
             while (nextUltimateTick < UltimateTickTimes.Length && castElapsed >= UltimateTickTimes[nextUltimateTick])
             {
                 nextUltimateTick++;
-                if (ultimateTarget.dead) continue;
                 skillAudio.Play(DanielSkillAudio.Cue.R_Tick);
-                Hurt(ultimateTarget, ultimateTickDamage);
+                if (!ultimateTarget.dead)
+                    Hurt(ultimateTarget, ultimateTickDamage);
             }
         }
         if (ultimateTime <= 0 || ultimateTarget == null) ExitUltimate();
