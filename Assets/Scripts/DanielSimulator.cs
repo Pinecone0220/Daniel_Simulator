@@ -41,7 +41,7 @@ public class DanielSimulator : MonoBehaviour
     [SerializeField, Min(0)] float startingAttackPower = 20f;
     int qLevel, wLevel, eLevel, rLevel, qCastLevel;
     float attackPower, qCastAttackPower, qAttackSpeedBonus;
-    float shadowStrikeDamage, shadowCooldown, ultimateTickDamage, ultimateExitDamage;
+    float shadowStrikeDamage, shadowCooldown, ultimateTickDamage, ultimateExitDamage, activeUltimateCooldown;
     float BonusAttackPower => Mathf.Max(0, attackPower - startingAttackPower);
     // The stored-damage stat is a percentage: +0.08 percentage points per bonus attack power.
     float MarkStoreRatio => WStore[wLevel - 1] + .0008f * BonusAttackPower;
@@ -54,10 +54,15 @@ public class DanielSimulator : MonoBehaviour
     static readonly float[] DaggerHaste = { .30f, .35f, .40f };
     static readonly float[] DaggerSlow = { .20f, .25f, .30f };
     static readonly float[] DaggerCooldown = { 30, 25, 20 };
-    const float DaggerRange = 3f;
+    const float DaggerRange = 3f, DaggerHasteDuration = 1f, DaggerRecastDuration = 3f;
     int weaponMastery = 5, daggerRank;
     float skillAmplification, daggerWindow, daggerCooldown;
-    Texture2D daggerIcon;
+    static readonly string[] SkillKeys = { "Q", "W", "E", "R", "D" };
+    static readonly string[] SkillNames = { "그림자 가위", "영감 표식", "그림자 이동", "걸작", "망토와 단검" };
+    readonly Texture2D[] skillIcons = new Texture2D[SkillKeys.Length];
+    Texture2D cooldownSweep;
+    DanielSkillVfx daggerCloakVfx;
+    GUIStyle skillKeyStyle, skillTimerStyle, skillTimerShadow, skillTooltipTitle;
     float[] cooldown = new float[4];
     int hits, dodged, kills, stealthUses;
     bool ended, won;
@@ -102,7 +107,14 @@ public class DanielSimulator : MonoBehaviour
     void Start() {
         skillAudio = gameObject.AddComponent<DanielSkillAudio>();
         font = Font.CreateDynamicFontFromOSFont(new[] { "Malgun Gothic", "Arial" }, 18);
-        daggerIcon = Resources.Load<Texture2D>("DaggerSkill"); white = Texture2D.whiteTexture; markerColor=new MaterialPropertyBlock();
+        for (int i = 0; i < SkillKeys.Length; i++)
+        {
+            string resource = i == 4 ? "DaggerSkill" : "Skill" + SkillKeys[i];
+            skillIcons[i] = Resources.Load<Texture2D>(resource);
+            if (!skillIcons[i]) Debug.LogError($"Skill icon Resources/{resource} could not be loaded.");
+        }
+        cooldownSweep = CreateCooldownSweep();
+        white = Texture2D.whiteTexture; markerColor=new MaterialPropertyBlock();
         // Soft-edged frame used to tint the screen while stealthed.
         vignette=new Texture2D(128,128,TextureFormat.RGBA32,false); vignette.wrapMode=TextureWrapMode.Clamp;
         for(int y=0;y<128;y++) for(int x=0;x<128;x++) {
@@ -431,7 +443,7 @@ public class DanielSimulator : MonoBehaviour
             if(e.ultimateLink) e.ultimateLink.SetRangeHighlight(Vector3.Distance(e.body.transform.position,player.transform.position)<=UltimateRange);
         }
         Vector3 delta=(IsUntargetable || dashTime>0)?Vector3.zero:destination-player.transform.position; delta.y=0;
-        float moveSpeed = 4.4f * (1f + (daggerWindow > 0 ? DaggerHaste[daggerRank] : 0f));
+        float moveSpeed = 4.4f * (1f + (daggerWindow > DaggerRecastDuration - DaggerHasteDuration ? DaggerHaste[daggerRank] : 0f));
         if(delta.magnitude>.08f) { player.transform.position+=delta.normalized*Mathf.Min(delta.magnitude, moveSpeed*dt); if(castFacingTime<=0) player.transform.rotation=Quaternion.RotateTowards(player.transform.rotation,Quaternion.LookRotation(delta),1080*dt); }
         if(characterAnimation) { characterAnimation.SetMoving(delta.magnitude>.08f && dashTime<=0 && ultimateTime<=0?moveSpeed:0); characterAnimation.SetStealth(stealth>0 || ultimateWindup>0); characterAnimation.SetUntargetableTint(IsUntargetable); }
         float swing=delta.magnitude>.1f?Mathf.Sin(Time.time*11)*25:0;
@@ -667,7 +679,8 @@ public class DanielSimulator : MonoBehaviour
             if (weaponMastery < 5 || daggerCooldown > 0) return;
             CancelUltimateExit();
             daggerRank = weaponMastery / 5 - 1;
-            daggerWindow = 1f;
+            daggerWindow = DaggerRecastDuration;
+            daggerCloakVfx = DanielSkillVfx.BeginDaggerCloak(player.transform, DaggerHasteDuration);
             daggerCooldown = DaggerCooldown[daggerRank];
             return;
         }
@@ -684,7 +697,10 @@ public class DanielSimulator : MonoBehaviour
         Vector3 behind = targetPosition - target.body.transform.forward * 1.2f;
         behind.x = Mathf.Clamp(behind.x, -11.8f, 11.8f);
         behind.z = Mathf.Clamp(behind.z, -8.8f, 8.8f);
-        DanielSkillVfx.DashTrail(player.transform.position, behind);
+        if (daggerCloakVfx) daggerCloakVfx.Stop();
+        if (characterAnimation) DanielSkillVfx.Afterimage(characterAnimation.transform, .19f);
+        DanielSkillVfx.DaggerStrike(player.transform.position, behind, targetPosition);
+        skillAudio.PlayBasicAttack();
         player.transform.position = destination = behind;
         Vector3 facing = targetPosition - behind;
         if (facing.sqrMagnitude > .001f) player.transform.rotation = Quaternion.LookRotation(facing);
@@ -742,7 +758,7 @@ public class DanielSimulator : MonoBehaviour
         player.transform.rotation=Quaternion.LookRotation(aim);
         ultimateTickDamage = UltimateTickDamage;
         ultimateExitDamage = UltimateExitDamage;
-        cooldown[3]=RCooldown[rLevel - 1]; attackTarget=null; stealth=0; ultimateTarget=targetR; ultimateWindup=UltimateWindupDuration; latchFrom=player.transform.position;
+        activeUltimateCooldown = RCooldown[rLevel - 1]; cooldown[3]=activeUltimateCooldown; attackTarget=null; stealth=0; ultimateTarget=targetR; ultimateWindup=UltimateWindupDuration; latchFrom=player.transform.position;
         if(characterAnimation) characterAnimation.PlayUltimateLatch();
         DanielSkillVfx.Latch(player.transform,UltimateWindupDuration);
         skillAudio.Play(DanielSkillAudio.Cue.R_Latch);
@@ -785,6 +801,10 @@ public class DanielSimulator : MonoBehaviour
         small=new GUIStyle(label){fontSize=13,normal={textColor=muted}};
         heading=new GUIStyle(label){fontSize=29,fontStyle=FontStyle.Bold,normal={textColor=Color.white}};
         centered=new GUIStyle(label){alignment=TextAnchor.MiddleCenter};
+        skillKeyStyle = new GUIStyle(centered) { fontSize = 13, fontStyle = FontStyle.Bold, normal = { textColor = Color.white } };
+        skillTimerStyle = new GUIStyle(skillKeyStyle) { fontSize = 23 };
+        skillTimerShadow = new GUIStyle(skillTimerStyle) { normal = { textColor = Color.black } };
+        skillTooltipTitle = new GUIStyle(label) { fontStyle = FontStyle.Bold, normal = { textColor = Color.white } };
         button=new GUIStyle(GUI.skin.button){font=font,fontSize=15,fontStyle=FontStyle.Bold,wordWrap=true};
     }
     void Box(Rect r,Color c) { GUI.color=c; GUI.DrawTexture(r,white); GUI.color=Color.white; }
@@ -799,7 +819,7 @@ public class DanielSimulator : MonoBehaviour
             if(Button(new Rect(60,316,380,65),"02   먼저 피하기     /     투사체 2회 회피 후 처치")) ResetGame(Mode.Puzzle2);
             if(Button(new Rect(60,392,380,65),"03   위험한 암살     /     은신을 사용해 두 적 처치")) ResetGame(Mode.Puzzle3);
             if(Button(new Rect(60,468,380,65),"∞   자유 연습     /     계속 등장하는 표적")) ResetGame(Mode.Free);
-            GUI.Label(new Rect(60,558,365,65),"우클릭 이동 · 마우스 방향 조준\n우클릭 적 공격 · Q 가위 · W 표식 · E 은신 · R 궁극기",small);
+            GUI.Label(new Rect(60,558,365,65),"우클릭 이동 · 마우스 방향 조준\n우클릭 적 공격 · Q 가위 · W 표식 · E 은신 · R 궁극기 · D 단검",small);
             GUI.Label(new Rect(840,600,400,50),"관찰  →  회피  →  진입  →  마무리",label); return;
         }
         if(stealthTint>.01f && !ended) {
@@ -813,20 +833,139 @@ public class DanielSimulator : MonoBehaviour
         Box(new Rect(25,84,370,116),new Color(.025f,.045f,.055f,.91f)); GUI.Label(new Rect(43,96,340,30),title,label); GUI.Label(new Rect(43,126,330,24),goal,small); GUI.Label(new Rect(43,155,335,30),"피격 " + hits + "   ·   회피 " + dodged + "   ·   처치 " + kills, label);
         Box(new Rect(25,211,230,62),new Color(.025f,.045f,.055f,.91f)); GUI.Label(new Rect(43,219,200,24),"체력  " + Mathf.Max(0,health).ToString("0") + " / 100",small); Box(new Rect(43,248,190,8),new Color(.18f,.22f,.23f)); Box(new Rect(43,248,190*Mathf.Max(0,health)/100,8),mint);
         if(shadowBuff>0) GUI.Label(new Rect(270,220,280,30),"그림자 평타 " + shadowBuff.ToString("0.0") + "초" + (stealth>0?" · 은신":""),label);
-        string[] keys={"Q","W","E","R"}; string[] names={"그림자 가위","영감 표식","그림자 이동","걸작"};
-        for(int i=0;i<4;i++) { float x=396+i*125; Box(new Rect(x,642,115,57),new Color(.025f,.045f,.055f,.94f)); GUI.Label(new Rect(x+9,647,100,23),keys[i]+"  "+names[i],small); GUI.Label(new Rect(x+9,670,100,23),(i==2 && shadowBuff>0)?"강화 중":(i==1 && enemies.Exists(e=>e.mark>0))?"표식 유지":cooldown[i]>0?cooldown[i].ToString("0.0")+"초":"준비",label); }
-        Box(new Rect(896,642,165,57),new Color(.025f,.045f,.055f,.94f));
-        if (daggerIcon) GUI.DrawTexture(new Rect(901,649,42,42), daggerIcon);
-        GUI.Label(new Rect(949,647,112,23), "D  망토와 단검", small);
-        string daggerStatus = daggerWindow > 0 ? $"단검 {daggerWindow:0.0}초" :
-            weaponMastery < 5 ? "숙련도 5 필요" : daggerCooldown > 0 ? $"{daggerCooldown:0.0}초" : "준비";
-        GUI.Label(new Rect(949,670,112,23), daggerStatus, small);
+        int hoveredSkill = DrawSkillBar();
         GUI.Label(new Rect(26,658,362,44),"우클릭 이동·공격 · A 공격 · S 정지\nY 시점 고정/해제 · Space 내 캐릭터 · 휠 확대/축소 · ESC 메뉴",small);
         if(Button(new Rect(1095,85,155,38),"다시 시작")) ResetGame(mode);
         if(Button(new Rect(1095,130,155,38),"메뉴로")) ResetGame(Mode.Menu);
         if (mode == Mode.Free && !ended) DrawPracticeSettings();
         foreach(var e in enemies) if(!e.dead && CanSeeEnemy(e)) { Vector3 screen=cam.WorldToScreenPoint(e.body.transform.position+Vector3.up*2.5f); if(screen.z<=0) continue; float x=screen.x/sx, y=(Screen.height-screen.y)/sy; Box(new Rect(x-36,y,72,6),new Color(.15f,.1f,.1f)); Box(new Rect(x-36,y,72*Mathf.Clamp01(e.hp/e.maxHp),6),red); if(e.boss) GUI.Label(new Rect(x-35,y-42,110,22),"연습 보스",small); if(e.mark>0) GUI.Label(new Rect(x-35,y-23,100,22),e.mark>WReadyTime?"영감 "+(e.mark-WReadyTime).ToString("0.0"):"영감 완성",small); }
+        if (!ended && hoveredSkill >= 0) DrawSkillTooltip(hoveredSkill);
         if(ended) { Box(new Rect(0,64,1280,656),new Color(0,0,0,.68f)); Box(new Rect(400,220,480,260),new Color(.04f,.075f,.08f,.98f)); GUI.Label(new Rect(430,246,420,45),won?"훈련 성공":"훈련 종료",heading); GUI.Label(new Rect(430,300,400,50),won?"좋은 진입이었습니다.":"목표 조건을 확인하고 다시 도전하세요.",label); GUI.Label(new Rect(430,348,400,30),"피격 " + hits + "   ·   회피 " + dodged + "   ·   처치 " + kills + "   ·   " + elapsed.ToString("0.0") + "초",small); if(Button(new Rect(430,399,185,48),"다시 도전")) ResetGame(mode); if(Button(new Rect(630,399,185,48),"메뉴로")) ResetGame(Mode.Menu); }
+    }
+
+    // Each cell is a clockwise fill fraction, sampled as a texture by IMGUI.
+    const int SweepColumns = 8, SweepCellSize = 64, SweepSteps = 64;
+    static Texture2D CreateCooldownSweep()
+    {
+        int width = SweepCellSize * SweepColumns;
+        var texture = new Texture2D(width, width, TextureFormat.RGBA32, false)
+        {
+            filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp
+        };
+        var pixels = new Color32[width * width];
+        for (int y = 0; y < SweepCellSize; y++)
+        for (int x = 0; x < SweepCellSize; x++)
+        {
+            float angle = Mathf.Repeat(Mathf.Atan2(x + .5f - SweepCellSize / 2f, y + .5f - SweepCellSize / 2f) / (2f * Mathf.PI), 1f);
+            for (int step = 1; step <= SweepSteps; step++)
+            {
+                int cell = step - 1;
+                int column = cell % SweepColumns * SweepCellSize + x;
+                int row = cell / SweepColumns * SweepCellSize + y;
+                byte alpha = (byte)Mathf.RoundToInt(255f * Mathf.Clamp01((step / (float)SweepSteps - angle) * SweepSteps + .5f));
+                pixels[row * width + column] = new Color32(255, 255, 255, alpha);
+            }
+        }
+        texture.SetPixels32(pixels);
+        texture.Apply(false, true);
+        return texture;
+    }
+
+    void OnDestroy()
+    {
+        if (cooldownSweep) Destroy(cooldownSweep);
+    }
+
+    int DrawSkillBar()
+    {
+        int hovered = -1;
+        float markTime = 0;
+        foreach (var enemy in enemies) markTime = Mathf.Max(markTime, enemy.mark);
+        Vector2 cursor = Event.current.mousePosition;
+        for (int i = 0; i < SkillKeys.Length; i++)
+        {
+            float active = 0, activeDuration = 1;
+            float remaining = i == 4 ? daggerCooldown : cooldown[i];
+            float cooldownDuration;
+            switch (i)
+            {
+                case 0: cooldownDuration = QCooldown[Mathf.Max(0, qCastLevel - 1)]; break;
+                case 1: cooldownDuration = WCooldown; active = markTime; activeDuration = WChargeTime + WReadyTime; break;
+                case 2: cooldownDuration = shadowCooldown; active = shadowBuff; activeDuration = ShadowDuration; break;
+                case 3: cooldownDuration = activeUltimateCooldown; active = ultimateTime; activeDuration = UltimateHoldDuration; break;
+                default: cooldownDuration = DaggerCooldown[daggerRank]; active = daggerWindow; activeDuration = DaggerRecastDuration; break;
+            }
+
+            var rect = new Rect(460 + i * 74, 637, 64, 64);
+            bool isHovered = rect.Contains(cursor);
+            if (isHovered) hovered = i;
+            bool locked = i == 4 && weaponMastery < 5 && active <= 0;
+            Color edge = active > 0 ? new Color(.40f, .90f, 1f) : new Color(.27f, .33f, .39f);
+            Box(new Rect(rect.x - 2, rect.y - 2, 68, 68), isHovered ? Color.white : edge);
+            Box(rect, new Color(.045f, .06f, .09f));
+            if (skillIcons[i]) GUI.DrawTexture(rect, skillIcons[i]);
+            if (locked) Box(rect, new Color(.02f, .03f, .06f, .7f));
+
+            float shownTime = active > 0 ? active : remaining;
+            if (!locked && shownTime > 0)
+            {
+                DrawCooldownSweep(rect, shownTime / Mathf.Max(.01f, active > 0 ? activeDuration : cooldownDuration),
+                    active > 0 ? new Color(.02f, .25f, .34f, .60f) : new Color(.015f, .02f, .04f, .77f));
+                string time = shownTime >= 1 ? Mathf.CeilToInt(shownTime).ToString() : shownTime.ToString("0.0");
+                GUI.Label(new Rect(rect.x + 1, rect.y - 1, rect.width, rect.height), time, skillTimerShadow);
+                GUI.Label(new Rect(rect.x, rect.y - 2, rect.width, rect.height), time, skillTimerStyle);
+            }
+            var key = new Rect(rect.xMax - 21, rect.yMax - 20, 19, 18);
+            Box(key, new Color(.02f, .03f, .05f, .92f));
+            GUI.Label(key, SkillKeys[i], skillKeyStyle);
+        }
+        return hovered;
+    }
+
+    void DrawCooldownSweep(Rect rect, float fraction, Color color)
+    {
+        int cell = Mathf.Clamp(Mathf.CeilToInt(fraction * SweepSteps) - 1, 0, SweepSteps - 1);
+        float size = cooldownSweep.width;
+        var uv = new Rect((cell % SweepColumns * SweepCellSize + .5f) / size,
+            (cell / SweepColumns * SweepCellSize + .5f) / size,
+            (SweepCellSize - 1f) / size, (SweepCellSize - 1f) / size);
+        GUI.color = color;
+        GUI.DrawTextureWithTexCoords(rect, cooldownSweep, uv);
+        GUI.color = Color.white;
+    }
+
+    void DrawSkillTooltip(int index)
+    {
+        string details;
+        switch (index)
+        {
+            case 0:
+                details = $"커서 위치에 가위를 소환해 {QWindup:0.##}초 뒤 벱니다. 중앙에 맞은 적에게 더 큰 피해를 입히고 둔화시킵니다. 적중 시 3초 동안 다음 기본 공격 3회의 공격 속도가 증가합니다.\n피해 {QDamage[qLevel - 1] + 1.1f * attackPower:0.#} / 중앙 {QCenterDamage[qLevel - 1] + 1.4f * attackPower:0.#}  ·  사거리 {QCastRange:0.#}m  ·  쿨다운 {QCooldown[qLevel - 1]:0}초";
+                break;
+            case 1:
+                details = $"적에게 영감 표식을 남기고 {WChargeTime:0.#}초 동안 가한 피해의 {MarkStoreRatio:P1}를 축적합니다. 표식이 완성된 뒤 다시 공격하면 축적 피해와 스킬 피해를 입힙니다.\n폭발 피해 {MarkSkillDamage:0.#} + 축적  ·  사거리 {WRange:0.#}m  ·  쿨다운 {WCooldown:0}초";
+                break;
+            case 2:
+                details = $"커서 방향으로 돌진해 {EStealth[eLevel - 1]:0.#}초 동안 은신합니다. 강화된 다음 기본 공격으로 적 뒤에 나타나 추가 피해를 입힙니다.\n추가 피해 {ShadowStrikeDamage:0.#}  ·  이동 거리 {ShadowDistance:0.#}m  ·  쿨다운 {ECooldown[eLevel - 1]:0}초";
+                break;
+            case 3:
+                details = $"최근 4초 안에 피해를 준 적의 그림자에 들어가 최대 {UltimateHoldDuration:0.#}초 동안 피해를 입힙니다. R을 다시 누르면 커서 방향으로 빠져나오며 추가 피해를 입힙니다. 탈출 도중 다른 스킬로 동작을 끊을 수 있습니다.\n틱 피해 {UltimateTickDamage:0.#} / 탈출 {UltimateExitDamage:0.#}  ·  사거리 {UltimateRange:0.#}m  ·  쿨다운 {RCooldown[rLevel - 1]:0}초";
+                break;
+            default:
+                int rank = daggerWindow > 0 ? daggerRank : Mathf.Max(0, weaponMastery / 5 - 1);
+                float damage = DaggerDamage[rank] + .5f * BonusAttackPower + .25f * skillAmplification;
+                details = $"망토: {DaggerHasteDuration:0.#}초간 이동 속도가 {DaggerHaste[rank]:P0} 증가합니다.\n단검: 망토 발동 후 {DaggerRecastDuration:0.#}초 안에 적을 지정해 재사용하면 뒤로 이동하여 {damage:0.#}의 스킬 피해와 현재 체력의 8%만큼 고정 피해를 입힙니다. 대상은 1초간 {DaggerSlow[rank]:P0} 둔화됩니다.\n사거리 {DaggerRange:0.#}m  ·  고정 쿨다운 {DaggerCooldown[rank]:0}초  ·  숙련도 5 / 10 / 15";
+                break;
+        }
+
+        const float width = 350;
+        float bodyHeight = label.CalcHeight(new GUIContent(details), width - 24);
+        float x = Mathf.Clamp(460 + index * 74 + 32 - width / 2, 12, 1268 - width);
+        float y = 628 - bodyHeight - 46;
+        Box(new Rect(x - 1, y - 1, width + 2, bodyHeight + 48), new Color(.29f, .38f, .47f));
+        Box(new Rect(x, y, width, bodyHeight + 46), new Color(.045f, .065f, .095f, .98f));
+        GUI.Label(new Rect(x + 12, y + 8, width - 24, 24), $"{SkillKeys[index]}  {SkillNames[index]}", skillTooltipTitle);
+        GUI.Label(new Rect(x + 12, y + 34, width - 24, bodyHeight), details, label);
     }
 
     void DrawPracticeSettings()

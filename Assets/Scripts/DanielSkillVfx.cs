@@ -8,7 +8,7 @@ using UnityEngine.Rendering;
 /// </summary>
 public sealed class DanielSkillVfx : MonoBehaviour
 {
-    enum Kind { Scissors, Mark, MarkBurst, Smoke, Trail, Ultimate, Slash, Ghost, Ping, Range, Latch, Stream, Veil, Boom, Link }
+    enum Kind { Scissors, Mark, MarkBurst, Smoke, Trail, Ultimate, Slash, Ghost, Ping, Range, Latch, Stream, Veil, Boom, Link, DaggerCloak, DaggerCut }
     Kind kind;
     float age, duration, windup, markProgress, height;
     bool markReady, rangeHighlight;
@@ -27,8 +27,12 @@ public sealed class DanielSkillVfx : MonoBehaviour
     readonly List<Transform> rings = new List<Transform>();
     readonly List<Vector3> moteOrigins = new List<Vector3>();
     readonly List<Vector3> moteVelocities = new List<Vector3>();
-    Material dark, purple, bright, soft, cyan, extra;
+    Material dark, purple, bright, soft, cyan, extra, daggerEdge;
     Color extraColor;
+
+    static readonly Color DaggerWind = new Color(.14f, .85f, 1f, .64f);
+    static readonly Color DaggerEdge = new Color(.90f, .98f, 1f, 1f);
+    static readonly Color DaggerImpact = new Color(1f, .19f, .13f, .96f);
 
     static readonly Color ShadowColor = new Color(.055f, .015f, .10f, .9f);
     static readonly Color VioletColor = new Color(.59f, .16f, .85f, .85f);
@@ -381,6 +385,65 @@ public sealed class DanielSkillVfx : MonoBehaviour
         fx.Arc("Violet edge",1.50f,145,.18f,fx.purple,fx.transform);
         fx.Line("Exit thrust",new[]{new Vector3(0,-.2f,0),new Vector3(0,-.2f,1.65f)},.06f,fx.bright,fx.transform);
         return fx;
+    }
+
+    public static DanielSkillVfx BeginDaggerCloak(Transform owner, float lifetime)
+    {
+        var fx = New(Kind.DaggerCloak, owner.position, owner.forward, lifetime);
+        fx.follow = owner;
+        fx.cyan = fx.MakeMaterial(DaggerWind);
+        fx.fan = new GameObject("Cloak wind").transform;
+        fx.fan.SetParent(fx.transform, false);
+        for (int band = 0; band < 3; band++)
+        {
+            var points = new Vector3[24];
+            for (int i = 0; i < points.Length; i++)
+            {
+                float t = i / (float)(points.Length - 1);
+                float angle = (band * 120f + t * 152f) * Mathf.Deg2Rad;
+                float radius = Mathf.Lerp(.95f, .53f, t);
+                points[i] = new Vector3(Mathf.Sin(angle) * radius, .13f + .92f * t, Mathf.Cos(angle) * radius);
+            }
+            var ribbon = fx.Line("Spiralling wind", points, .10f, fx.cyan, fx.fan);
+            ribbon.widthCurve = new AnimationCurve(new Keyframe(0, 0), new Keyframe(.48f, 1), new Keyframe(1, 0));
+        }
+        fx.Line("Low speed streak", new[] { new Vector3(-.33f, .13f, .1f), new Vector3(-.4f, .11f, -1.05f), new Vector3(-.23f, .1f, -1.85f) }, .055f, fx.cyan, fx.transform);
+        fx.Line("High speed streak", new[] { new Vector3(.26f, .8f, .05f), new Vector3(.36f, .57f, -.8f), new Vector3(.18f, .35f, -1.45f) }, .07f, fx.cyan, fx.transform);
+        return fx;
+    }
+
+    public static void DaggerStrike(Vector3 from, Vector3 landing, Vector3 target)
+    {
+        Vector3 travel = landing - from;
+        travel.y = 0;
+        var trail = New(Kind.DaggerCut, from + Vector3.up * .62f, travel, .23f);
+        trail.cyan = trail.MakeMaterial(DaggerWind);
+        float length = travel.magnitude;
+        var streak = trail.Line("Dash streak", new[] { Vector3.zero, new Vector3(.10f, .07f, length * .6f), Vector3.forward * length }, .33f, trail.cyan, trail.transform);
+        streak.widthCurve = new AnimationCurve(new Keyframe(0, 0), new Keyframe(.75f, 1), new Keyframe(1, 0));
+
+        Vector3 direction = target - landing;
+        var fx = New(Kind.DaggerCut, landing + Vector3.up * .88f, direction, .32f);
+        fx.cyan = fx.MakeMaterial(DaggerWind);
+        fx.extraColor = DaggerImpact;
+        fx.extra = fx.MakeMaterial(DaggerImpact);
+        var edge = fx.MakeMaterial(DaggerEdge);
+        fx.daggerEdge = edge;
+        fx.fan = new GameObject("Sweeping blade").transform;
+        fx.fan.SetParent(fx.transform, false);
+        fx.Arc("Cyan blade trail", 1.32f, 136, .24f, fx.cyan, fx.fan);
+        fx.Arc("White cutting edge", 1.39f, 126, .088f, edge, fx.fan);
+        Vector3 hit = fx.transform.InverseTransformPoint(target + Vector3.up * 1.05f);
+        fx.flash = new GameObject("Hit spark").transform;
+        fx.flash.SetParent(fx.transform, false);
+        fx.flash.localPosition = hit;
+        for (int i = 0; i < 6; i++)
+        {
+            float angle = i * Mathf.PI / 3f;
+            var ray = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), Mathf.Sin(angle + .55f) * .42f);
+            fx.Line("Red impact ray", new[] { ray * .06f, ray * (.35f + .11f * (i % 3)) }, .055f, fx.extra, fx.flash);
+            fx.Line("White impact core", new[] { Vector3.zero, ray * .21f }, .038f, edge, fx.flash);
+        }
     }
 
     public static DanielSkillVfx AttackSlash(Vector3 position, Vector3 direction, bool empowered = false)
@@ -775,6 +838,26 @@ public sealed class DanielSkillVfx : MonoBehaviour
             }
             extraColor=Color.Lerp(extraColor,rangeHighlight?LinkNear:LinkFar,1-Mathf.Exp(-18*dt));
             Tint(extra,extraColor,Mathf.Clamp01(age/.12f));
+        }
+        if (kind == Kind.DaggerCloak)
+        {
+            if (!follow) { Destroy(gameObject); return; }
+            transform.SetPositionAndRotation(follow.position, follow.rotation);
+            fan.localRotation = Quaternion.Euler(0, age * 430f, 0);
+            fan.localScale = Vector3.one * Mathf.Lerp(.75f, 1.2f, Mathf.Clamp01(age / .32f));
+            float envelope = Mathf.Lerp(.36f, 1f, Mathf.Sin(Mathf.Clamp01(age / .26f) * Mathf.PI));
+            Tint(cyan, DaggerWind, envelope * Mathf.Clamp01((duration - age) / .2f));
+        }
+        if (kind == Kind.DaggerCut)
+        {
+            Tint(cyan, DaggerWind, fade * fade);
+            if (daggerEdge) Tint(daggerEdge, DaggerEdge, fade);
+            if (fan) fan.localRotation = Quaternion.Euler(0, Mathf.Lerp(-38f, 48f, 1f - fade * fade), -12f);
+            if (flash)
+            {
+                flash.localScale = Vector3.one * Mathf.Lerp(.72f, 1.4f, 1f - fade * fade);
+                if (age > .17f) flash.gameObject.SetActive(false);
+            }
         }
         if(kind==Kind.Ping) flash.localScale=Vector3.one*Mathf.Lerp(.25f,1,fade);
         if(kind==Kind.Slash) transform.localScale=Vector3.one*(.8f+.3f*(1-fade));
