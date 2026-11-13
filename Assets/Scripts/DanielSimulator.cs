@@ -13,7 +13,15 @@ public class DanielSimulator : MonoBehaviour
         public bool Moves, Attacks;
         public EnemySettings(int hp) { Hp = hp; }
     }
+    sealed class FireZone
+    {
+        public Vector3 From, To;
+        public float Start, NextTick, Damage;
+    }
     class Enemy {
+        public bool adriana, dashing, trailStarted;
+        public float dashStart, dashReady;
+        public Vector3 dashFrom, dashTo;
         public GameObject body, warning, markVisual;
         public DanielSkillVfx markSight;
         public Renderer[] renderers;
@@ -66,6 +74,13 @@ public class DanielSimulator : MonoBehaviour
     int weaponMastery = 5, daggerRank;
     readonly EnemySettings practiceTarget = new EnemySettings(1000), practiceBoss = new EnemySettings(1000);
     int practiceTab;
+    bool placeAdriana;
+    int adrianaLevel = 1;
+    float adrianaAmp;
+    readonly List<FireZone> fireZones = new List<FireZone>();
+    static readonly float[] AdrianaDamage = { 26, 32, 38, 44, 50 };
+    const float AdrianaWindup = .27f, AdrianaTravel = .42f, AdrianaRange = 6f, AdrianaCooldown = 1f;
+    const float FireWidth = .8f, FireLifetime = 5f, FireInterval = .5f;
     bool fastPracticeCooldowns;
     float PracticeCooldown(float duration) => mode == Mode.Free && fastPracticeCooldowns ? .1f : duration;
     enum TargetEdit { None, PlaceEnemy, PlaceBoss, Remove }
@@ -284,6 +299,7 @@ public class DanielSimulator : MonoBehaviour
     void ResetGame(Mode next) {
         skillAudio.StopAll();
         damageNumbers.Clear();
+        fireZones.Clear();
         SetTargetEdit(TargetEdit.None);
         if (next != Mode.Free || mode != Mode.Free)
         {
@@ -335,19 +351,144 @@ public class DanielSimulator : MonoBehaviour
         shadow=Shape(PrimitiveType.Cylinder,"Player marker",destination+Vector3.up*.035f,new Vector3(.78f,.025f,.78f),new Color(.29f,.9f,.68f),arena.transform);
         if(next!=Mode.Menu) { AddEnemy(new Vector3(4,0,2),0); if(next==Mode.Puzzle3) AddEnemy(new Vector3(7,0,-3),1.1f); }
     }
-    void AddEnemy(Vector3 position, float offset, bool boss = false) {
-        Enemy e = new Enemy { boss = boss, timer = 1.4f + offset };
-        e.body = new GameObject(boss ? "Training boss" : "Training target");
+    void AddEnemy(Vector3 position, float offset, bool boss = false, bool adriana = false) {
+        Enemy e = new Enemy { boss = boss, adriana = adriana, timer = 1.4f + offset };
+        e.body = new GameObject(adriana ? "Adriana" : boss ? "Training boss" : "Training target");
         e.body.transform.position = position;
         if (mode == Mode.Free) e.hp = e.maxHp = (boss ? practiceBoss : practiceTarget).Hp;
         else if (boss) e.hp = e.maxHp = 1000;
         Transform savedLL=leftLeg, savedRL=rightLeg, savedLA=leftArm, savedRA=rightArm;
         BuildFighter(e.body.transform, false); leftLeg=savedLL; rightLeg=savedRL; leftArm=savedLA; rightArm=savedRA;
+        if (adriana)
+        {
+            Part("Fuel tank", new Vector3(0,1.27f,-.28f), new Vector3(.38f,.65f,.29f), new Color(.78f,.27f,.06f), e.body.transform, Vector3.zero);
+            Part("Nozzle", new Vector3(.49f,.98f,.30f), new Vector3(.17f,.17f,.53f), new Color(.82f,.57f,.23f), e.body.transform, Vector3.zero);
+        }
         foreach (Transform part in e.body.transform) { part.localPosition *= FighterModelScale; part.localScale *= FighterModelScale; }
         BuildOutline(e);
         e.renderers = e.body.GetComponentsInChildren<Renderer>(true);
         e.warning=Shape(PrimitiveType.Cube,"Attack telegraph",Vector3.zero,new Vector3(.65f,.035f,1),new Color(.9f,.29f,.23f),arena.transform); e.warning.SetActive(false); enemies.Add(e);
     }
+    void StartAdrianaReactions()
+    {
+        foreach (var enemy in enemies)
+        {
+            if (!enemy.adriana || enemy.dead || enemy.dashing || Time.time < enemy.dashReady) continue;
+            enemy.dashFrom = enemy.body.transform.position;
+            enemy.dashTo = FarthestDashPoint(enemy.dashFrom, player.transform.position);
+            Vector3 direction = enemy.dashTo - enemy.dashFrom;
+            if (direction.sqrMagnitude <= .001f) continue;
+            enemy.dashing = true;
+            enemy.trailStarted = false;
+            enemy.dashStart = Time.time + AdrianaWindup;
+            enemy.dashReady = Time.time + AdrianaCooldown;
+            enemy.body.transform.rotation = Quaternion.LookRotation(direction);
+            enemy.windup = -1;
+            enemy.warning.SetActive(false);
+            skillAudio.Play(DanielSkillAudio.Cue.Adriana_Dash);
+        }
+    }
+
+    static Vector3 FarthestDashPoint(Vector3 origin, Vector3 playerPosition)
+    {
+        const float limitX = 11.5f, limitZ = 8.5f;
+        float radiusSquared = AdrianaRange * AdrianaRange;
+        Vector3 best = origin;
+        float bestDistance = (origin - playerPosition).sqrMagnitude;
+
+        void Consider(Vector3 point)
+        {
+            if (Mathf.Abs(point.x) > limitX || Mathf.Abs(point.z) > limitZ ||
+                (point - origin).sqrMagnitude > radiusSquared + .001f) return;
+            float distance = (point - playerPosition).sqrMagnitude;
+            if (distance <= bestDistance) return;
+            best = point;
+            bestDistance = distance;
+        }
+
+        Vector3 away = origin - playerPosition;
+        away.y = 0f;
+        Consider(origin + (away.sqrMagnitude > .0001f ? away.normalized : Vector3.forward) * AdrianaRange);
+        for (int side = -1; side <= 1; side += 2)
+        {
+            float x = side * limitX, z = side * limitZ;
+            Consider(new Vector3(x, 0f, limitZ));
+            Consider(new Vector3(x, 0f, -limitZ));
+            float xReach = radiusSquared - (x - origin.x) * (x - origin.x);
+            if (xReach >= 0f)
+            {
+                float reach = Mathf.Sqrt(xReach);
+                Consider(new Vector3(x, 0f, origin.z + reach));
+                Consider(new Vector3(x, 0f, origin.z - reach));
+            }
+            float zReach = radiusSquared - (z - origin.z) * (z - origin.z);
+            if (zReach >= 0f)
+            {
+                float reach = Mathf.Sqrt(zReach);
+                Consider(new Vector3(origin.x + reach, 0f, z));
+                Consider(new Vector3(origin.x - reach, 0f, z));
+            }
+        }
+        return best;
+    }
+
+    void UpdateAdrianaDash(Enemy enemy)
+    {
+        if (!enemy.dashing || enemy.dead || Time.time < enemy.dashStart) return;
+        if (!enemy.trailStarted)
+        {
+            enemy.trailStarted = true;
+            fireZones.Add(new FireZone
+            {
+                From = enemy.dashFrom, To = enemy.dashTo, Start = enemy.dashStart,
+                NextTick = enemy.dashStart + FireInterval,
+                Damage = AdrianaDamage[adrianaLevel - 1] + .15f * adrianaAmp
+            });
+            var trail = DanielSkillVfx.AdrianaFireTrail(enemy.dashFrom, enemy.dashTo, FireWidth, AdrianaTravel, FireLifetime);
+            trail.Sample(Time.time - enemy.dashStart);
+        }
+
+        float progress = Mathf.Clamp01((Time.time - enemy.dashStart) / AdrianaTravel);
+        enemy.body.transform.position = Vector3.Lerp(enemy.dashFrom, enemy.dashTo, progress);
+        if (progress >= 1f) enemy.dashing = false;
+    }
+
+    static bool FireContains(FireZone zone, Vector3 point)
+    {
+        Vector3 path = zone.To - zone.From;
+        Vector3 offset = point - zone.From;
+        offset.y = 0f;
+        float along = Vector3.Dot(offset, path) / path.sqrMagnitude;
+        float extent = Mathf.Clamp01((Time.time - zone.Start) / AdrianaTravel);
+        return along >= 0f && along <= extent &&
+            (offset - along * path).sqrMagnitude <= FireWidth * FireWidth * .25f;
+    }
+
+    bool IsInFire(Vector3 point)
+    {
+        foreach (var zone in fireZones)
+            if (Time.time < zone.Start + AdrianaTravel + FireLifetime && FireContains(zone, point)) return true;
+        return false;
+    }
+
+    void UpdateFireZones()
+    {
+        for (int i = fireZones.Count - 1; i >= 0; i--)
+        {
+            var zone = fireZones[i];
+            float end = zone.Start + AdrianaTravel + FireLifetime;
+            while (zone.NextTick <= Time.time && zone.NextTick <= end)
+            {
+                zone.NextTick += FireInterval;
+                if (IsUntargetable || health <= 0f || !FireContains(zone, player.transform.position)) continue;
+                health -= zone.Damage;
+                ShowDamage(player.transform.position, zone.Damage, DamageType.Skill);
+                hits++;
+            }
+            if (Time.time >= end) fireZones.RemoveAt(i);
+        }
+    }
+
     bool IsUltimateTarget(Enemy target) =>
         target != null && !target.dead && target.recentDamage > 0 &&
         (!target.boss || (mode == Mode.Free && practiceBossUltimate));
@@ -419,6 +560,7 @@ public class DanielSimulator : MonoBehaviour
             else { attackTarget=null; destination=MouseWorld(); destination.x=Mathf.Clamp(destination.x,-11.8f,11.8f); destination.z=Mathf.Clamp(destination.z,-8.8f,8.8f); destination.y=0; DanielSkillVfx.ClickMarker(destination,false); }
         }
         attackTimer = Mathf.Max(0, attackTimer - dt * AttackSpeedMultiplier);
+        foreach (var enemy in enemies) UpdateAdrianaDash(enemy);
         if(ultimateWindup>0 && ultimateTarget!=null) {
             // Pre-delay: rooted where the skill was cast and untargetable, then pours into the target's shadow as smoke.
             ultimateWindup-=dt;
@@ -483,6 +625,7 @@ public class DanielSimulator : MonoBehaviour
         }
         Vector3 delta=(IsUntargetable || dashTime>0)?Vector3.zero:destination-player.transform.position; delta.y=0;
         float moveSpeed = 4.4f * (1f + (daggerWindow > DaggerRecastDuration - DaggerHasteDuration ? DaggerHaste[daggerRank] : 0f));
+        if (IsInFire(player.transform.position)) moveSpeed *= .7f;
         if(delta.magnitude>.08f) { player.transform.position+=delta.normalized*Mathf.Min(delta.magnitude, moveSpeed*dt); if(castFacingTime<=0) player.transform.rotation=Quaternion.RotateTowards(player.transform.rotation,Quaternion.LookRotation(delta),1080*dt); }
         if(characterAnimation) { characterAnimation.SetMoving(delta.magnitude>.08f && dashTime<=0 && ultimateTime<=0?moveSpeed:0); characterAnimation.SetStealth(stealth>0 || ultimateWindup>0); characterAnimation.SetUntargetableTint(IsUntargetable); }
         float swing=delta.magnitude>.1f?Mathf.Sin(Time.time*11)*25:0;
@@ -503,6 +646,7 @@ public class DanielSimulator : MonoBehaviour
             if(s.damage>0 && Vector3.Distance(s.body.transform.position,player.transform.position+Vector3.up*.55f)<.75f && invulnerable<=0 && !IsUntargetable) { health-=s.damage; ShowDamage(player.transform.position, s.damage, DamageType.Skill); hits++; invulnerable=.6f; s.life=0; Show("피격! 진입하기 전에 투사체를 피하세요."); }
             if(s.life<=0 || Mathf.Abs(s.body.transform.position.x)>13 || Mathf.Abs(s.body.transform.position.z)>10) { if(s.life>0) dodged++; Destroy(s.body); shots.RemoveAt(i); }
         }
+        UpdateFireZones();
         if(health<=0) { SetTargetEdit(TargetEdit.None); Finish(false); }
         else if(!IsUntargetable && mode==Mode.Puzzle1 && kills>=1) Finish(hits<=2);
         else if(!IsUntargetable && mode==Mode.Puzzle2 && kills>=1) Finish(dodged>=2);
@@ -578,6 +722,7 @@ public class DanielSimulator : MonoBehaviour
         if (e.slow <= 0) e.slowFactor = 1;
         e.timer -= dt;
         e.recentDamage = Mathf.Max(0, e.recentDamage - dt);
+        if (e.dashing) return;
         if(moves && e.windup<0 && seesPlayer) {
             Vector3 away=e.body.transform.position-player.transform.position; away.y=0;
             if(away.magnitude<4.5f && away.sqrMagnitude>.01f) {
@@ -845,6 +990,7 @@ public class DanielSimulator : MonoBehaviour
         if(characterAnimation) characterAnimation.PlayUltimateLatch();
         DanielSkillVfx.Latch(player.transform,UltimateWindupDuration);
         skillAudio.PlayUltimate();
+        StartAdrianaReactions();
         Show("걸작: 0.5초 뒤 표적의 그림자 속으로 들어갑니다. 최대 2초 유지, R 재사용으로 커서 방향에 나옵니다.");
     }
     void ApplyMark(Enemy target)
@@ -930,6 +1076,7 @@ public class DanielSimulator : MonoBehaviour
                 Box(new Rect(x-36,y+8,72,3),new Color(.09f,.16f,.15f));
                 if (remaining > 0f) Box(new Rect(x-36,y+8,72*remaining,3),mint);
             }
+            if (e.adriana) GUI.Label(new Rect(x-38,y-25,100,22),"아드리아나",small);
             if(e.boss) GUI.Label(new Rect(x-35,y-42,110,22),"연습 보스",small);
         }
         DrawDummyStats(sx, sy);
@@ -1149,7 +1296,7 @@ public class DanielSimulator : MonoBehaviour
     }
 
     static readonly string[] PracticeTabs = { "다니엘", "일반 적", "보스" };
-    Rect PracticePanelRect => new Rect(960, 182, 290, practiceSettingsOpen ? 320 : 38);
+    Rect PracticePanelRect => new Rect(960, 182, 290, practiceSettingsOpen ? (practiceTab == 1 ? 385 : 320) : 38);
 
     void DrawPracticeSettings()
     {
@@ -1210,8 +1357,22 @@ public class DanielSimulator : MonoBehaviour
         if (boss && Button(new Rect(973, 396, 263, 28), practiceBossUltimate ? "보스 대상 R 허용" : "보스 대상 R 금지"))
             practiceBossUltimate = !practiceBossUltimate;
         TargetEdit place = boss ? TargetEdit.PlaceBoss : TargetEdit.PlaceEnemy;
-        DrawTargetEditButton(431, place, boss ? "보스 배치" : "일반 적 배치");
-        DrawTargetEditButton(463, TargetEdit.Remove, "적 삭제");
+        if (boss)
+        {
+            DrawTargetEditButton(431, place, "보스 배치");
+            DrawTargetEditButton(463, TargetEdit.Remove, "적 삭제");
+            return;
+        }
+
+        string kind = placeAdriana ? "아드리아나" : "기본";
+        if (Button(new Rect(973, 396, 263, 28), "더미 종류  ·  " + kind)) placeAdriana = !placeAdriana;
+        if (placeAdriana)
+        {
+            adrianaLevel = DrawPracticeValue("아드리아나 E 레벨", adrianaLevel, 429, 1, 1, AdrianaDamage.Length);
+            adrianaAmp = DrawPracticeValue("아드리아나 스킬 증폭", adrianaAmp, 454, 5, 0, 10000f);
+        }
+        DrawTargetEditButton(483, place, "선택한 더미 배치");
+        DrawTargetEditButton(515, TargetEdit.Remove, "적 삭제");
     }
 
     void DrawTargetEditButton(float y, TargetEdit edit, string caption)
@@ -1277,7 +1438,7 @@ public class DanielSimulator : MonoBehaviour
                     Vector3 position = ray.GetPoint(distance);
                     if (Mathf.Abs(position.x) <= 11.5f && Mathf.Abs(position.z) <= 8.5f)
                     {
-                        AddEnemy(position, 0f, boss: targetEdit == TargetEdit.PlaceBoss);
+                        AddEnemy(position, 0f, boss: targetEdit == TargetEdit.PlaceBoss, adriana: targetEdit == TargetEdit.PlaceEnemy && placeAdriana);
                         SetTargetEdit(TargetEdit.None);
                     }
                 }

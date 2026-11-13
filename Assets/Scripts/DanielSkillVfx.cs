@@ -8,7 +8,7 @@ using UnityEngine.Rendering;
 /// </summary>
 public sealed class DanielSkillVfx : MonoBehaviour
 {
-    enum Kind { Scissors, Mark, MarkBurst, Smoke, Trail, Ultimate, Slash, Ghost, Ping, Range, Latch, Stream, Veil, Boom, Link, DaggerCloak, DaggerCut }
+    enum Kind { Scissors, Mark, MarkBurst, Smoke, Trail, Ultimate, Slash, Ghost, Ping, Range, Latch, Stream, Veil, Boom, Link, DaggerCloak, DaggerCut, FireTrail }
     Kind kind;
     float age, duration, windup, markProgress, height;
     bool markReady, rangeHighlight;
@@ -446,6 +446,34 @@ public sealed class DanielSkillVfx : MonoBehaviour
         }
     }
 
+    public static DanielSkillVfx AdrianaFireTrail(Vector3 start, Vector3 end, float width, float travel, float lifetime)
+    {
+        float length = Vector3.Distance(start, end);
+        var fx = New(Kind.FireTrail, start, end - start, travel + lifetime);
+        fx.windup = travel;
+        fx.extraColor = new Color(1f, .30f, .04f, .82f);
+        fx.extra = fx.MakeMaterial(fx.extraColor);
+        fx.cyan = fx.MakeMaterial(new Color(1f, .72f, .16f, .92f));
+        fx.fan = fx.MeshPart("Scorched ground", fx.SectorMesh(.5f, 360), fx.dark, fx.transform).transform;
+        fx.fan.localScale = Vector3.zero;
+        fx.fan.localPosition = Vector3.up * .04f;
+
+        var ember = fx.Octahedron();
+        int count = Mathf.Max(2, Mathf.CeilToInt(length * 7));
+        for (int i = 0; i < count; i++)
+        {
+            float z = length * i / (count - 1);
+            float x = Mathf.Sin(i * 2.4f) * width * .29f;
+            var flame = fx.MeshPart("Flame", ember, i % 3 == 0 ? fx.cyan : fx.extra, fx.transform).transform;
+            flame.localScale = Vector3.zero;
+            fx.motes.Add(flame);
+            fx.moteOrigins.Add(new Vector3(x, .23f, z));
+        }
+        fx.height = width;
+        fx.startPoint = Vector3.forward * length;
+        return fx;
+    }
+
     public static DanielSkillVfx AttackSlash(Vector3 position, Vector3 direction, bool empowered = false)
     {
         var fx=New(Kind.Slash,position+Vector3.up*.9f,direction,empowered?.32f:.24f);
@@ -857,6 +885,23 @@ public sealed class DanielSkillVfx : MonoBehaviour
             {
                 flash.localScale = Vector3.one * Mathf.Lerp(.72f, 1.4f, 1f - fade * fade);
                 if (age > .17f) flash.gameObject.SetActive(false);
+            }
+        }
+        if (kind == Kind.FireTrail)
+        {
+            float length = startPoint.z * Mathf.Clamp01(age / windup);
+            fan.localPosition = new Vector3(0, .04f, length * .5f);
+            fan.localScale = new Vector3(height, 1f, length + height);
+            fade = Mathf.Clamp01((duration - age) / .45f);
+            Tint(cyan, new Color(1f, .72f, .16f, .92f), fade);
+            for (int i = 0; i < motes.Count; i++)
+            {
+                Vector3 origin = moteOrigins[i];
+                if (origin.z > length) continue;
+                float wave = .5f + .5f * Mathf.Sin(age * (17f + i % 5) + i * 2.4f);
+                motes[i].localPosition = origin + Vector3.up * (.26f * wave);
+                motes[i].localRotation = Quaternion.Euler(8f, i * 37f, (wave - .5f) * 35f);
+                motes[i].localScale = new Vector3(.19f, .26f + .36f * wave, .18f) * fade;
             }
         }
         if(kind==Kind.Ping) flash.localScale=Vector3.one*Mathf.Lerp(.25f,1,fade);
