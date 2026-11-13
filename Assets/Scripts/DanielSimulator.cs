@@ -62,6 +62,19 @@ public class DanielSimulator : MonoBehaviour
     readonly Texture2D[] skillIcons = new Texture2D[SkillKeys.Length];
     Texture2D cooldownSweep;
     DanielSkillVfx daggerCloakVfx;
+    enum DamageType { Skill, Basic, True }
+    struct DamageNumber
+    {
+        public Vector3 Position;
+        public Vector2 Offset;
+        public float Started;
+        public string Text;
+        public Color Color;
+    }
+
+    const float DamageNumberLifetime = .85f;
+    readonly List<DamageNumber> damageNumbers = new List<DamageNumber>();
+    GUIStyle damageNumberStyle;
     GUIStyle skillKeyStyle, skillTimerStyle, skillTimerShadow, skillTooltipTitle;
     float[] cooldown = new float[4];
     int hits, dodged, kills, stealthUses;
@@ -252,6 +265,7 @@ public class DanielSimulator : MonoBehaviour
     }
     void ResetGame(Mode next) {
         skillAudio.StopAll();
+        damageNumbers.Clear();
         if (next != Mode.Free || mode != Mode.Free)
         {
             qLevel = Mathf.Clamp(startingQLevel, 1, QDamage.Length);
@@ -461,7 +475,7 @@ public class DanielSimulator : MonoBehaviour
         }
         for(int i=shots.Count-1;i>=0;i--) {
             Shot s=shots[i]; s.body.transform.position+=s.velocity*dt; s.life-=dt;
-            if(Vector3.Distance(s.body.transform.position,player.transform.position+Vector3.up*.55f)<.75f && invulnerable<=0 && !IsUntargetable) { health-=25; hits++; invulnerable=.6f; s.life=0; Show("피격! 진입하기 전에 투사체를 피하세요."); }
+            if(Vector3.Distance(s.body.transform.position,player.transform.position+Vector3.up*.55f)<.75f && invulnerable<=0 && !IsUntargetable) { health-=25; ShowDamage(player.transform.position, 25f, DamageType.Skill); hits++; invulnerable=.6f; s.life=0; Show("피격! 진입하기 전에 투사체를 피하세요."); }
             if(s.life<=0 || Mathf.Abs(s.body.transform.position.x)>13 || Mathf.Abs(s.body.transform.position.z)>10) { if(s.life>0) dodged++; Destroy(s.body); shots.RemoveAt(i); }
         }
         if(health<=0) Finish(false);
@@ -553,26 +567,33 @@ public class DanielSimulator : MonoBehaviour
         foreach(var e in enemies) { if(e.dead || !CanSeeEnemy(e)) continue; Vector3 screen=cam.WorldToScreenPoint(e.body.transform.position+Vector3.up); float d=Vector2.Distance(point,new Vector2(screen.x,screen.y)); if(screen.z>0 && d<distance) { distance=d; best=e; } }
         return best;
     }
-    void Hurt(Enemy e, float amount, float extraSkillDamage = 0f, bool canDetonateMark = true)
+    void Hurt(Enemy e, float amount, DamageType type = DamageType.Skill, float extraSkillDamage = 0f, float trueDamage = 0f, bool canDetonateMark = true)
     {
         if (e == null || e.dead) return;
         e.visionDebuff = 0;
-        float damage = amount + extraSkillDamage;
+        Vector3 position = e.body.transform.position;
+        float skillDamage = extraSkillDamage + (type == DamageType.Skill ? amount : 0f);
+        float basicDamage = type == DamageType.Basic ? amount : 0f;
+        float damage = amount + extraSkillDamage + trueDamage;
+        float markBurstDamage = 0f;
         if (e.mark > WReadyTime)
             e.storedDamage += damage * e.markStoreRatio;
         else if (e.mark > 0 && canDetonateMark)
         {
             // The arena has no defense stat. Both the stored true damage and skill damage go directly to HP.
-            float trueDamage = e.storedDamage;
-            float skillDamage = e.markSkillDamage;
+            markBurstDamage = e.storedDamage + e.markSkillDamage;
             ClearMark(e);
-            damage += trueDamage + skillDamage;
+            damage += markBurstDamage;
             DanielSkillVfx.MarkBurst(e.body.transform.position);
             skillAudio.Play(DanielSkillAudio.Cue.W_Burst);
             e.markSlow = 1f;
         }
         if (damage > 0) e.recentDamage = 4;
         e.hp -= damage;
+        ShowDamage(position, basicDamage, DamageType.Basic);
+        ShowDamage(position, skillDamage, DamageType.Skill);
+        ShowDamage(position, trueDamage, DamageType.True);
+        ShowDamage(position, markBurstDamage, DamageType.True);
         if (e.hp <= 0)
         {
             if (e.mark > 0) ClearMark(e);
@@ -593,14 +614,14 @@ public class DanielSimulator : MonoBehaviour
             if(characterAnimation) characterAnimation.PlayAttack(true, AttackSpeedMultiplier);
             DanielSkillVfx.SmokeBurst(player.transform.position,-side); DanielSkillVfx.AttackSlash(e.body.transform.position,-side,true); castFacingTime=.3f;
             skillAudio.Play(DanielSkillAudio.Cue.E_Strike);
-            Hurt(e, attackPower, extraSkillDamage: shadowStrikeDamage);
+            Hurt(e, attackPower, DamageType.Basic, extraSkillDamage: shadowStrikeDamage);
             stealth = 0; quietReveal = true; shadowBuff = 0; cooldown[2] = shadowCooldown;
         } else {
             if(characterAnimation) characterAnimation.PlayAttack(false, AttackSpeedMultiplier);
             DanielSkillVfx.AttackSlash(e.body.transform.position,player.transform.forward);
             skillAudio.PlayBasicAttack();
             castFacingTime=.25f;
-            Hurt(e,attackPower);
+            Hurt(e, attackPower, DamageType.Basic);
         }
         attackTimer = BasicAttackInterval;
         if (qBuffAttacks > 0) qBuffAttacks--;
@@ -682,6 +703,7 @@ public class DanielSimulator : MonoBehaviour
             daggerWindow = DaggerRecastDuration;
             daggerCloakVfx = DanielSkillVfx.BeginDaggerCloak(player.transform, DaggerHasteDuration);
             daggerCooldown = DaggerCooldown[daggerRank];
+            skillAudio.Play(DanielSkillAudio.Cue.D_Cloak);
             return;
         }
 
@@ -700,7 +722,7 @@ public class DanielSimulator : MonoBehaviour
         if (daggerCloakVfx) daggerCloakVfx.Stop();
         if (characterAnimation) DanielSkillVfx.Afterimage(characterAnimation.transform, .19f);
         DanielSkillVfx.DaggerStrike(player.transform.position, behind, targetPosition);
-        skillAudio.PlayBasicAttack();
+        skillAudio.Play(DanielSkillAudio.Cue.D_Strike);
         player.transform.position = destination = behind;
         Vector3 facing = targetPosition - behind;
         if (facing.sqrMagnitude > .001f) player.transform.rotation = Quaternion.LookRotation(facing);
@@ -709,7 +731,7 @@ public class DanielSimulator : MonoBehaviour
         target.daggerSlowTime = 1f;
         target.daggerSlowFactor = 1f - DaggerSlow[daggerRank];
         float skillDamage = DaggerDamage[daggerRank] + .5f * BonusAttackPower + .25f * skillAmplification;
-        Hurt(target, skillDamage, extraSkillDamage: .08f * target.hp);
+        Hurt(target, skillDamage, trueDamage: .08f * target.hp);
     }
     void Cast(int index) {
         if(ultimateWindup>0) return;
@@ -801,6 +823,7 @@ public class DanielSimulator : MonoBehaviour
         small=new GUIStyle(label){fontSize=13,normal={textColor=muted}};
         heading=new GUIStyle(label){fontSize=29,fontStyle=FontStyle.Bold,normal={textColor=Color.white}};
         centered=new GUIStyle(label){alignment=TextAnchor.MiddleCenter};
+        damageNumberStyle = new GUIStyle(centered) { fontSize = 24, fontStyle = FontStyle.Bold, wordWrap = false };
         skillKeyStyle = new GUIStyle(centered) { fontSize = 13, fontStyle = FontStyle.Bold, normal = { textColor = Color.white } };
         skillTimerStyle = new GUIStyle(skillKeyStyle) { fontSize = 23 };
         skillTimerShadow = new GUIStyle(skillTimerStyle) { normal = { textColor = Color.black } };
@@ -838,9 +861,57 @@ public class DanielSimulator : MonoBehaviour
         if(Button(new Rect(1095,85,155,38),"다시 시작")) ResetGame(mode);
         if(Button(new Rect(1095,130,155,38),"메뉴로")) ResetGame(Mode.Menu);
         if (mode == Mode.Free && !ended) DrawPracticeSettings();
-        foreach(var e in enemies) if(!e.dead && CanSeeEnemy(e)) { Vector3 screen=cam.WorldToScreenPoint(e.body.transform.position+Vector3.up*2.5f); if(screen.z<=0) continue; float x=screen.x/sx, y=(Screen.height-screen.y)/sy; Box(new Rect(x-36,y,72,6),new Color(.15f,.1f,.1f)); Box(new Rect(x-36,y,72*Mathf.Clamp01(e.hp/e.maxHp),6),red); if(e.boss) GUI.Label(new Rect(x-35,y-42,110,22),"연습 보스",small); if(e.mark>0) GUI.Label(new Rect(x-35,y-23,100,22),e.mark>WReadyTime?"영감 "+(e.mark-WReadyTime).ToString("0.0"):"영감 완성",small); }
+        foreach(var e in enemies) if(!e.dead && CanSeeEnemy(e)) { Vector3 screen=cam.WorldToScreenPoint(e.body.transform.position+Vector3.up*2.5f); if(screen.z<=0) continue; float x=screen.x/sx, y=(Screen.height-screen.y)/sy; Box(new Rect(x-36,y,72,6),new Color(.15f,.1f,.1f)); Box(new Rect(x-36,y,72*Mathf.Clamp01(e.hp/e.maxHp),6),red); if(e.boss) GUI.Label(new Rect(x-35,y-42,110,22),"연습 보스",small); }
+        DrawDamageNumbers(sx, sy);
         if (!ended && hoveredSkill >= 0) DrawSkillTooltip(hoveredSkill);
         if(ended) { Box(new Rect(0,64,1280,656),new Color(0,0,0,.68f)); Box(new Rect(400,220,480,260),new Color(.04f,.075f,.08f,.98f)); GUI.Label(new Rect(430,246,420,45),won?"훈련 성공":"훈련 종료",heading); GUI.Label(new Rect(430,300,400,50),won?"좋은 진입이었습니다.":"목표 조건을 확인하고 다시 도전하세요.",label); GUI.Label(new Rect(430,348,400,30),"피격 " + hits + "   ·   회피 " + dodged + "   ·   처치 " + kills + "   ·   " + elapsed.ToString("0.0") + "초",small); if(Button(new Rect(430,399,185,48),"다시 도전")) ResetGame(mode); if(Button(new Rect(630,399,185,48),"메뉴로")) ResetGame(Mode.Menu); }
+    }
+
+    void ShowDamage(Vector3 position, float amount, DamageType type)
+    {
+        if (amount <= 0) return;
+
+        float now = Time.unscaledTime;
+        int nearby = 0;
+        foreach (var number in damageNumbers)
+        {
+            if (now - number.Started < .23f && (number.Position - position).sqrMagnitude < 1f)
+                nearby++;
+        }
+        float horizontal = nearby == 0 ? 0 : (nearby % 2 == 1 ? 1 : -1) * 31f;
+        damageNumbers.Add(new DamageNumber
+        {
+            Position = position,
+            Offset = new Vector2(horizontal, -23f * (nearby / 2) - (nearby % 2 == 1 ? 12f : 0f)),
+            Started = now,
+            Text = amount.ToString("0.#"),
+            Color = type == DamageType.True ? Color.white :
+                type == DamageType.Basic ? new Color(1f, .31f, .31f) : new Color(.78f, .43f, 1f)
+        });
+    }
+
+    void DrawDamageNumbers(float sx, float sy)
+    {
+        if (Event.current.type != EventType.Repaint) return;
+
+        float now = Time.unscaledTime;
+        damageNumbers.RemoveAll(number => now - number.Started >= DamageNumberLifetime);
+        foreach (var number in damageNumbers)
+        {
+            Vector3 screen = cam.WorldToScreenPoint(number.Position + Vector3.up * 2.8f);
+            if (screen.z <= 0) continue;
+
+            float progress = (now - number.Started) / DamageNumberLifetime;
+            float alpha = 1f - Mathf.SmoothStep(0, 1, Mathf.InverseLerp(.42f, 1f, progress));
+            float rise = Mathf.Lerp(0, 45f, Mathf.SmoothStep(0, 1, progress));
+            var rect = new Rect(screen.x / sx - 56f + number.Offset.x,
+                (Screen.height - screen.y) / sy - 16f + number.Offset.y - rise, 112, 32);
+
+            damageNumberStyle.normal.textColor = new Color(.04f, .025f, .06f, alpha);
+            GUI.Label(new Rect(rect.x + 1.5f, rect.y + 1.5f, rect.width, rect.height), number.Text, damageNumberStyle);
+            damageNumberStyle.normal.textColor = new Color(number.Color.r, number.Color.g, number.Color.b, alpha);
+            GUI.Label(rect, number.Text, damageNumberStyle);
+        }
     }
 
     // Each cell is a clockwise fill fraction, sampled as a texture by IMGUI.

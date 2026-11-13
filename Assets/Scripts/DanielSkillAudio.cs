@@ -6,7 +6,7 @@ public sealed class DanielSkillAudio : MonoBehaviour
     public enum Cue
     {
         Q_Cast, Q_Snap, W_Charge, W_Ready, W_Burst, E_Dash, E_Strike,
-        R_Latch, R_Enter, R_Tick, R_Exit, Attack_1, Attack_2, Step_1, Step_2
+        R_Latch, R_Enter, R_Tick, R_Exit, Attack_1, Attack_2, Step_1, Step_2, D_Cloak, D_Strike
     }
 
     AudioClip[] clips;
