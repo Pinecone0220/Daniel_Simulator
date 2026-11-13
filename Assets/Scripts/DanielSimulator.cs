@@ -122,10 +122,9 @@ public class DanielSimulator : MonoBehaviour
     static readonly float[] RCooldown = { 70, 60, 50 };
     static readonly float QFanSlope = Mathf.Tan(QHalfAngle * Mathf.Deg2Rad);
     float AttackSpeedMultiplier => qBuffAttacks > 0 ? 1f + qAttackSpeedBonus : 1f;
-    const float UltimateWindupDuration = .5f, UltimateDuration = 2.05f;
+    const float UltimateWindupDuration = .5f, UltimateHoldDuration = 2f;
     const float FighterModelScale = .9f;
-    const float UltimateHoldDuration = UltimateDuration - UltimateWindupDuration;
-    // Attack transients in R_Full.wav, measured from the start of the cast.
+    // Tick rhythm measured from when Daniel attaches to the target.
     static readonly float[] UltimateTickTimes = { .885f, 1.225f, 1.585f, 1.930f };
     MaterialPropertyBlock markerColor;
     Material outlineMaterial;
@@ -716,9 +715,9 @@ public class DanielSimulator : MonoBehaviour
         if (ultimateTarget != null)
         {
             player.transform.position = ultimateTarget.body.transform.position;
-            float castElapsed = UltimateDuration - ultimateTime;
+            float holdElapsed = UltimateHoldDuration - ultimateTime;
             // The cast keeps its sound rhythm after a kill. Only living targets take damage.
-            while (nextUltimateTick < UltimateTickTimes.Length && castElapsed >= UltimateTickTimes[nextUltimateTick])
+            while (nextUltimateTick < UltimateTickTimes.Length && holdElapsed >= UltimateTickTimes[nextUltimateTick])
             {
                 nextUltimateTick++;
                 skillAudio.Play(DanielSkillAudio.Cue.R_Tick);
@@ -1123,7 +1122,7 @@ public class DanielSimulator : MonoBehaviour
                 details = $"커서 방향으로 돌진해 {EStealth[eLevel - 1]:0.#}초 동안 은신합니다. 강화된 다음 기본 공격으로 적 뒤에 나타나 추가 피해를 입힙니다.\n추가 피해 {ShadowStrikeDamage:0.#}  ·  이동 거리 {ShadowDistance:0.#}m  ·  쿨다운 {ECooldown[eLevel - 1]:0}초";
                 break;
             case 3:
-                details = $"최근 4초 안에 피해를 준 적의 그림자에 들어가 피해를 입힙니다. 시전 시작 {UltimateDuration:0.##}초 뒤 자동으로 빠져나옵니다. R을 다시 누르면 커서 방향으로 빠져나오며 추가 피해를 입힙니다. 탈출 도중 다른 스킬로 동작을 끊을 수 있습니다.\n틱 피해 {UltimateTickDamage:0.#} / 탈출 {UltimateExitDamage:0.#}  ·  사거리 {UltimateRange:0.#}m  ·  쿨다운 {RCooldown[rLevel - 1]:0}초";
+                details = $"최근 4초 안에 피해를 준 적의 그림자에 들어가 피해를 입힙니다. 대상에게 달라붙은 뒤 {UltimateHoldDuration:0.##}초가 지나면 자동으로 빠져나옵니다. R을 다시 누르면 커서 방향으로 빠져나오며 추가 피해를 입힙니다. 탈출 도중 다른 스킬로 동작을 끊을 수 있습니다.\n틱 피해 {UltimateTickDamage:0.#} / 탈출 {UltimateExitDamage:0.#}  ·  사거리 {UltimateRange:0.#}m  ·  쿨다운 {RCooldown[rLevel - 1]:0}초";
                 break;
             default:
                 int rank = daggerWindow > 0 ? daggerRank : Mathf.Max(0, weaponMastery / 5 - 1);
