@@ -1,0 +1,25 @@
+Q / W / E / R 영상 직접 추출본
+
+포맷: WAV, PCM 16-bit, 44.1 kHz, 스테레오.
+영상의 오디오 트랙을 시간으로 잘랐습니다. 합성, 음량 보정, 노이즈 제거, 페이드는 적용하지 않았습니다.
+기존 영상에 함께 녹음된 소리와 잔향도 들어 있습니다. 아래 시간은 원본 영상의 재생 위치입니다.
+Full은 스킬별 전체 구간, 나머지는 같은 구간을 이벤트별로 분할한 파일입니다.
+
+Q_Full.wav       0.85 - 2.40 s
+Q_Cast.wav       0.85 - 1.37 s
+Q_Snap.wav       1.37 - 2.40 s
+
+W_Full.wav       1.08 - 8.85 s
+W_Charge.wav     1.08 - 5.07 s
+W_Ready.wav      5.07 - 6.35 s
+W_Burst.wav      6.35 - 8.85 s
+
+E_Full.wav       0.91 - 3.77 s
+E_Dash.wav       0.91 - 2.39 s
+E_Strike.wav     2.39 - 3.77 s
+
+R_Full.wav       4.74 - 9.48 s
+R_Latch.wav      4.74 - 5.15 s
+R_Enter.wav      5.15 - 5.52 s
+R_Ticks.wav      5.52 - 7.18 s
+R_Exit.wav       7.18 - 9.48 s

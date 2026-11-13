@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"C:/Users/PC/Desktop/Game_Project/3D/Daniel_Simulator\" && ls -la && find . -type f -not -path \"./node_modules/*\" -not -path \"./.git/*\" -not -path \"./.godot/*\" -not -path \"./Library/*\" | head -150; which ffmpeg ffprobe; ls -la /c/Users/PC/Downloads/daniel_*.mp4)",
+      "Bash(python -I __TRACKED_VAR__/ult.py .)",
+      "Bash(dotnet build *)",
+      "Bash(python -I -c ' *)",
+      "Bash(PYTHONIOENCODING=utf-8 python -I -c ' *)",
+      "Bash(tasklist)",
+      "Bash(cp Assets/Scripts/DanielCharacterAnimation.cs __TRACKED_VAR__/DanielCharacterAnimation.cs.bak)",
+      "Bash(python -I __TRACKED_VAR__/patch.py __TRACKED_VAR__/new_eval.cs Assets/Scripts/DanielCharacterAnimation.cs)",
+      "Read(//c/Program Files/Unity/Hub/Editor/**)",
+      "Bash(wmic process *)",
+      "Bash(mkdir -p __TRACKED_VAR__/bak2)",
+      "Bash(cp Assets/Scripts/*.cs __TRACKED_VAR__/bak2/)",
+      "Bash(python -I __TRACKED_VAR__/patch2.py .)"
+    ]
+  }
+}
