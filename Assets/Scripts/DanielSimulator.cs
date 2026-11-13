@@ -1060,7 +1060,7 @@ public class DanielSimulator : MonoBehaviour
                 case 0: cooldownDuration = QCooldown[Mathf.Max(0, qCastLevel - 1)]; break;
                 case 1: cooldownDuration = WCooldown; active = markTime; activeDuration = WChargeTime + WReadyTime; break;
                 case 2: cooldownDuration = shadowCooldown; active = shadowBuff; activeDuration = ShadowDuration; break;
-                case 3: cooldownDuration = activeUltimateCooldown; active = ultimateWindup + ultimateTime + ultimateExitTime; break;
+                case 3: cooldownDuration = activeUltimateCooldown; active = ultimateTime; activeDuration = UltimateHoldDuration; break;
                 default: cooldownDuration = DaggerCooldown[daggerRank]; active = daggerWindow; activeDuration = DaggerRecastDuration; break;
             }
 
@@ -1068,22 +1068,21 @@ public class DanielSimulator : MonoBehaviour
             bool isHovered = rect.Contains(cursor);
             if (isHovered) hovered = i;
             bool locked = i == 4 && weaponMastery < 5 && active <= 0;
-            Color edge = active > 0 ? new Color(.40f, .90f, 1f) : new Color(.27f, .33f, .39f);
+            Color edge = active > 0 || (i == 3 && IsUntargetable) ? new Color(.40f, .90f, 1f) : new Color(.27f, .33f, .39f);
             Box(new Rect(rect.x - 2, rect.y - 2, 68, 68), isHovered ? Color.white : edge);
             Box(rect, new Color(.045f, .06f, .09f));
             if (skillIcons[i]) GUI.DrawTexture(rect, skillIcons[i]);
             if (locked) Box(rect, new Color(.02f, .03f, .06f, .7f));
 
-            bool inUse = active > 0 && i >= 1 && i <= 3;
+            bool showTimer = active <= 0 || i == 3 || i == 4;
             float shownTime = active > 0 ? active : remaining;
-            if (!locked && shownTime > 0)
+            if (!locked && showTimer && shownTime > 0)
             {
-                if (inUse) Box(rect, new Color(.02f, .25f, .34f, .53f));
-                else DrawCooldownSweep(rect, shownTime / Mathf.Max(.01f, active > 0 ? activeDuration : PracticeCooldown(cooldownDuration)),
+                DrawCooldownSweep(rect, shownTime / Mathf.Max(.01f, active > 0 ? activeDuration : PracticeCooldown(cooldownDuration)),
                     active > 0 ? new Color(.02f, .25f, .34f, .60f) : new Color(.015f, .02f, .04f, .77f));
-                string time = inUse ? "사용 중" : shownTime >= 1 ? Mathf.CeilToInt(shownTime).ToString() : shownTime.ToString("0.0");
-                GUI.Label(new Rect(rect.x + 1, rect.y - 1, rect.width, rect.height), time, inUse ? skillKeyStyle : skillTimerShadow);
-                if (!inUse) GUI.Label(new Rect(rect.x, rect.y - 2, rect.width, rect.height), time, skillTimerStyle);
+                string time = shownTime >= 1 ? Mathf.CeilToInt(shownTime).ToString() : shownTime.ToString("0.0");
+                GUI.Label(new Rect(rect.x + 1, rect.y - 1, rect.width, rect.height), time, skillTimerShadow);
+                GUI.Label(new Rect(rect.x, rect.y - 2, rect.width, rect.height), time, skillTimerStyle);
             }
             var key = new Rect(rect.xMax - 21, rect.yMax - 20, 19, 18);
             Box(key, new Color(.02f, .03f, .05f, .92f));
