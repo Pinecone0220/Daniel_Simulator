@@ -915,7 +915,7 @@ public class DanielSimulator : MonoBehaviour
             Position = position,
             Offset = new Vector2(horizontal, -23f * (nearby / 2) - (nearby % 2 == 1 ? 12f : 0f)),
             Started = now,
-            Text = amount.ToString("0.#"),
+            Text = System.Math.Round(amount, System.MidpointRounding.AwayFromZero).ToString("0"),
             Color = type == DamageType.True ? Color.white :
                 type == DamageType.Basic ? new Color(1f, .31f, .31f) : new Color(.78f, .43f, 1f)
         });
