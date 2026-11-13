@@ -96,15 +96,44 @@ public sealed class DanielCharacterAnimation : MonoBehaviour
     public void PlayUltimateEnter() { Play("Enter", .2f); }
     /// <summary>R pre-delay: gather in, then sink toward the ground. The simulator hides the model at 0.5s.</summary>
     public void PlayUltimateLatch() { Play("Latch"); }
-    public void PlayUltimateExit() { SetHidden(false); Play("Exit"); }
+    public const float UltimateExitDuration = .3f;
+    public void PlayUltimateExit() { SetHidden(false); Play("Exit", UltimateExitDuration); }
+    public void CancelUltimateExit() { if (action == "Exit") Play("Idle", 0); }
+
+    MaterialPropertyBlock untargetableTint;
+    bool untargetableTintActive;
+    public void SetUntargetableTint(bool value)
+    {
+        if (untargetableTintActive == value) return;
+        Initialize();
+        if (untargetableTint == null) untargetableTint = new MaterialPropertyBlock();
+        untargetableTintActive = value;
+        for (int r = 0; r < renderers.Length; r++)
+        {
+            if (!renderers[r]) continue;
+            var materials = renderers[r].sharedMaterials;
+            for (int m = 0; m < materials.Length; m++)
+            {
+                if (!value) { renderers[r].SetPropertyBlock(null, m); continue; }
+                var material = materials[m];
+                if (!material || !material.HasProperty("_BaseColor")) continue;
+                Color color = material.GetColor("_BaseColor");
+                untargetableTint.SetColor("_BaseColor", new Color(color.r * .38f, color.g * .38f, color.b * .48f, color.a));
+                renderers[r].SetPropertyBlock(untargetableTint, m);
+            }
+        }
+    }
     public void SetStealth(bool value)
     {
         Initialize(); if (stealth == value) return; stealth = value; stealthAge = 0;
+        bool restoreTint = untargetableTintActive;
+        if (restoreTint) SetUntargetableTint(false);
         for (int r = 0; r < renderers.Length; r++) if (renderers[r])
         {
             renderers[r].sharedMaterials = value ? ghostMaterials[r] : normalMaterials[r];
             renderers[r].shadowCastingMode = value ? ShadowCastingMode.Off : ShadowCastingMode.On;
         }
+        if (restoreTint) SetUntargetableTint(true);
     }
     public void SetHidden(bool value)
     {

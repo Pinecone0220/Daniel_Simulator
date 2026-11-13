@@ -55,7 +55,9 @@ public class DanielSimulator : MonoBehaviour
     Font font;
     GUIStyle label, small, heading, button, centered;
     Texture2D white, vignette;
-    float stealthTint;
+    float stealthTint, ultimateExitTime;
+    Vector3 ultimateExitFrom, ultimateExitTo;
+    bool IsUntargetable => ultimateWindup > 0 || ultimateTime > 0 || ultimateExitTime > 0;
     const float DashTravel=.28f, UltimateRange=3f;
     internal const float QCastRange = 7f, QRadius = 3.5f, QHalfAngle = 32.5f;
     internal const float QWindup = .53f, QCenterHalfWidth = .3f;
@@ -240,7 +242,7 @@ public class DanielSimulator : MonoBehaviour
         if(characterAnimation) characterAnimation.Footstep -= skillAudio.PlayFootstep;
         if(ultimateVfx) ultimateVfx.Stop(); ultimateVfx=null; characterAnimation=null; castFacingTime=0;
         foreach(var effect in FindObjectsByType<DanielSkillVfx>(FindObjectsSortMode.None)) Destroy(effect.gameObject);
-        mode=next; ended=false; won=false; health=100; stealth=0; shadowBuff=0; invulnerable=0; elapsed=0; hits=0; dodged=0; kills=0; stealthUses=0; attackTimer=0; ultimateTime=0; ultimateWindup=0; stealthTint=0; qDelay=0; qBuffTime=0; qBuffAttacks=0; dashTime=0; nextUltimateTick=0; if(qEffect) Destroy(qEffect); attackTarget=null; ultimateTarget=null;
+        mode=next; ended=false; won=false; health=100; stealth=0; shadowBuff=0; invulnerable=0; elapsed=0; hits=0; dodged=0; kills=0; stealthUses=0; attackTimer=0; ultimateTime=0; ultimateWindup=0; ultimateExitTime=0; stealthTint=0; qDelay=0; qBuffTime=0; qBuffAttacks=0; dashTime=0; nextUltimateTick=0; if(qEffect) Destroy(qEffect); attackTarget=null; ultimateTarget=null;
         for(int i=0;i<4;i++) cooldown[i]=0;
         foreach(var e in enemies) { if(e.body) Destroy(e.body); if(e.warning) Destroy(e.warning); } enemies.Clear();
         foreach(var s in shots) if(s.body) Destroy(s.body); shots.Clear();
@@ -303,7 +305,8 @@ public class DanielSimulator : MonoBehaviour
     // Hover outline: every body part gets a slightly larger shell drawn with front faces culled.
     void BuildOutline(Enemy e) {
         if(outlineMaterial==null) {
-            var shader=Shader.Find("Universal Render Pipeline/Unlit"); if(shader==null) shader=Shader.Find("Unlit/Color");
+            var shader=Shader.Find("Universal Render Pipeline/Unlit");
+            if(shader==null) return;
             outlineMaterial=new Material(shader); outlineMaterial.SetColor("_BaseColor",new Color(1f,.86f,.35f)); outlineMaterial.color=new Color(1f,.86f,.35f);
             outlineMaterial.SetFloat("_Cull",(float)UnityEngine.Rendering.CullMode.Front);
         }
@@ -335,17 +338,21 @@ public class DanielSimulator : MonoBehaviour
         foreach (var e in enemies) if (!e.dead) AdvanceMark(e, dt);
         stealthTint=Mathf.MoveTowards(stealthTint,stealth>0?1:0,dt*(stealth>0?6:4)); castFacingTime=Mathf.Max(0,castFacingTime-dt);
         stealth=Mathf.Max(0,stealth-dt); if(shadowBuff>0) { shadowBuff-=dt; if(shadowBuff<=0) { shadowBuff=0; cooldown[2]=shadowCooldown; } }
+        if (ultimateExitTime > 0)
+        {
+            ultimateExitTime = Mathf.Max(0, ultimateExitTime - dt);
+            float progress = Mathf.Clamp01(1f - ultimateExitTime / DanielCharacterAnimation.UltimateExitDuration);
+            player.transform.position = Vector3.Lerp(ultimateExitFrom, ultimateExitTo, Mathf.SmoothStep(0, 1, progress));
+            destination = player.transform.position;
+        }
         invulnerable=Mathf.Max(0,invulnerable-dt); qBuffTime=Mathf.Max(0,qBuffTime-dt); if(qBuffTime<=0) qBuffAttacks=0;
         if(qDelay>0) { qDelay-=dt; if(qDelay<=0) ResolveQ(); }
         if(dashTime>0) { afterimageTimer-=dt; if(afterimageTimer<=0 && characterAnimation) { DanielSkillVfx.Afterimage(characterAnimation.transform,.3f); afterimageTimer=.045f; } dashTime=Mathf.Max(0,dashTime-dt); { float dashK=1-dashTime/DashTravel; player.transform.position=Vector3.Lerp(dashFrom,dashTo,1-(1-dashK)*(1-dashK)); } destination=player.transform.position; }
         for(int i=0;i<4;i++) cooldown[i]=Mathf.Max(0,cooldown[i]-dt);
-        if(Mouse.current!=null && Mouse.current.rightButton.wasPressedThisFrame) {
+        if(!IsUntargetable && Mouse.current!=null && Mouse.current.rightButton.wasPressedThisFrame) {
             Enemy clicked=EnemyAtCursor();
             if(clicked!=null) { attackTarget=clicked; DanielSkillVfx.ClickMarker(clicked.body.transform.position,true); Show("표적을 추격하고 기본 공격합니다."); }
             else { attackTarget=null; destination=MouseWorld(); destination.x=Mathf.Clamp(destination.x,-11.8f,11.8f); destination.z=Mathf.Clamp(destination.z,-8.8f,8.8f); destination.y=0; DanielSkillVfx.ClickMarker(destination,false); }
-        } else if(Mouse.current!=null && Mouse.current.rightButton.isPressed && attackTarget==null) {
-            // Holding the button keeps steering toward the cursor.
-            destination=MouseWorld(); destination.x=Mathf.Clamp(destination.x,-11.8f,11.8f); destination.z=Mathf.Clamp(destination.z,-8.8f,8.8f); destination.y=0;
         }
         attackTimer = Mathf.Max(0, attackTimer - dt * AttackSpeedMultiplier);
         if(ultimateWindup>0 && ultimateTarget!=null) {
@@ -376,7 +383,7 @@ public class DanielSimulator : MonoBehaviour
             if(ultimateVfx && ultimateTarget!=null) ultimateVfx.SetExitDirection(MouseWorld()-ultimateTarget.body.transform.position);
             AdvanceUltimate(dt);
         }
-        if(attackTarget!=null && !attackTarget.dead && CanSeeEnemy(attackTarget) && ultimateTime<=0 && ultimateWindup<=0 && dashTime<=0) {
+        if(attackTarget!=null && !attackTarget.dead && CanSeeEnemy(attackTarget) && !IsUntargetable && dashTime<=0) {
             Vector3 d=attackTarget.body.transform.position-player.transform.position; d.y=0; float reach=shadowBuff>0?ShadowRange:1.45f;
             if(d.magnitude>reach) destination=attackTarget.body.transform.position-d.normalized*(reach-.1f);
             else { destination=player.transform.position; if(attackTimer<=0) BasicAttack(attackTarget); }
@@ -385,9 +392,9 @@ public class DanielSimulator : MonoBehaviour
             Vector3 move=Vector3.zero;
             if(Keyboard.current.upArrowKey.isPressed) move+=Vector3.forward; if(Keyboard.current.downArrowKey.isPressed) move+=Vector3.back;
             if(Keyboard.current.leftArrowKey.isPressed) move+=Vector3.left; if(Keyboard.current.rightArrowKey.isPressed) move+=Vector3.right;
-            if(move!=Vector3.zero) { attackTarget=null; destination=player.transform.position+move.normalized*2; }
-            if(Keyboard.current.sKey.wasPressedThisFrame) { attackTarget=null; destination=player.transform.position; }
-            if(Keyboard.current.aKey.wasPressedThisFrame) {
+            if(!IsUntargetable && move!=Vector3.zero) { attackTarget=null; destination=player.transform.position+move.normalized*2; }
+            if(!IsUntargetable && Keyboard.current.sKey.wasPressedThisFrame) { attackTarget=null; destination=player.transform.position; }
+            if(!IsUntargetable && Keyboard.current.aKey.wasPressedThisFrame) {
                 Enemy nearest=EnemyAtCursor(); Vector3 cursor=MouseWorld(); float best=6f;
                 if(nearest==null) foreach(var e in enemies) { if(e.dead || !CanSeeEnemy(e)) continue; float d=Vector3.Distance(e.body.transform.position,cursor); if(d<best) { best=d; nearest=e; } }
                 if(nearest!=null) { attackTarget=nearest; DanielSkillVfx.ClickMarker(nearest.body.transform.position,true); } else Show("A: 커서 근처에 공격할 적이 없습니다.");
@@ -410,9 +417,9 @@ public class DanielSimulator : MonoBehaviour
             else if(!link && e.ultimateLink) { e.ultimateLink.Stop(); e.ultimateLink=null; }
             if(e.ultimateLink) e.ultimateLink.SetRangeHighlight(Vector3.Distance(e.body.transform.position,player.transform.position)<=UltimateRange);
         }
-        Vector3 delta=(ultimateTime>0 || ultimateWindup>0 || dashTime>0)?Vector3.zero:destination-player.transform.position; delta.y=0;
+        Vector3 delta=(IsUntargetable || dashTime>0)?Vector3.zero:destination-player.transform.position; delta.y=0;
         if(delta.magnitude>.08f) { player.transform.position+=delta.normalized*Mathf.Min(delta.magnitude, 4.4f*dt); if(castFacingTime<=0) player.transform.rotation=Quaternion.RotateTowards(player.transform.rotation,Quaternion.LookRotation(delta),1080*dt); }
-        if(characterAnimation) { characterAnimation.SetMoving(delta.magnitude>.08f && dashTime<=0 && ultimateTime<=0?4.4f:0); characterAnimation.SetStealth(stealth>0 || ultimateWindup>0); }
+        if(characterAnimation) { characterAnimation.SetMoving(delta.magnitude>.08f && dashTime<=0 && ultimateTime<=0?4.4f:0); characterAnimation.SetStealth(stealth>0 || ultimateWindup>0); characterAnimation.SetUntargetableTint(IsUntargetable); }
         float swing=delta.magnitude>.1f?Mathf.Sin(Time.time*11)*25:0;
         if(leftLeg) leftLeg.localRotation=Quaternion.Euler(swing,0,0); if(rightLeg) rightLeg.localRotation=Quaternion.Euler(-swing,0,0);
         if(leftArm) leftArm.localRotation=Quaternion.Euler(-swing*.7f,0,-10); if(rightArm) rightArm.localRotation=Quaternion.Euler(swing*.7f,0,10);
@@ -428,13 +435,13 @@ public class DanielSimulator : MonoBehaviour
         }
         for(int i=shots.Count-1;i>=0;i--) {
             Shot s=shots[i]; s.body.transform.position+=s.velocity*dt; s.life-=dt;
-            if(Vector3.Distance(s.body.transform.position,player.transform.position+Vector3.up*.55f)<.75f && invulnerable<=0 && ultimateTime<=0 && ultimateWindup<=0) { health-=25; hits++; invulnerable=.6f; s.life=0; Show("피격! 진입하기 전에 투사체를 피하세요."); }
+            if(Vector3.Distance(s.body.transform.position,player.transform.position+Vector3.up*.55f)<.75f && invulnerable<=0 && !IsUntargetable) { health-=25; hits++; invulnerable=.6f; s.life=0; Show("피격! 진입하기 전에 투사체를 피하세요."); }
             if(s.life<=0 || Mathf.Abs(s.body.transform.position.x)>13 || Mathf.Abs(s.body.transform.position.z)>10) { if(s.life>0) dodged++; Destroy(s.body); shots.RemoveAt(i); }
         }
         if(health<=0) Finish(false);
-        else if(ultimateTime<=0 && ultimateWindup<=0 && mode==Mode.Puzzle1 && kills>=1) Finish(hits<=2);
-        else if(ultimateTime<=0 && ultimateWindup<=0 && mode==Mode.Puzzle2 && kills>=1) Finish(dodged>=2);
-        else if(ultimateTime<=0 && ultimateWindup<=0 && mode==Mode.Puzzle3 && kills>=2) Finish(stealthUses>=1 && hits<=3);
+        else if(!IsUntargetable && mode==Mode.Puzzle1 && kills>=1) Finish(hits<=2);
+        else if(!IsUntargetable && mode==Mode.Puzzle2 && kills>=1) Finish(dodged>=2);
+        else if(!IsUntargetable && mode==Mode.Puzzle3 && kills>=2) Finish(stealthUses>=1 && hits<=3);
         else if(mode==Mode.Free && kills>=enemies.Count && shots.Count==0) { AddEnemy(new Vector3(Random.Range(3f,9f),0,Random.Range(-6f,6f)),0); }
     }
     // Quarter-view chase camera: locked to the player by default, Y frees it for edge panning.
@@ -496,7 +503,7 @@ public class DanielSimulator : MonoBehaviour
         if (e.slow <= 0) e.slowFactor = 1;
         e.timer -= dt;
         e.recentDamage = Mathf.Max(0, e.recentDamage - dt);
-        if(e.windup<0 && seesPlayer && stealth<=0 && ultimateTime<=0 && ultimateWindup<=0) {
+        if(e.windup<0 && seesPlayer && stealth<=0 && !IsUntargetable) {
             Vector3 away=e.body.transform.position-player.transform.position; away.y=0;
             if(away.magnitude<4.5f && away.sqrMagnitude>.01f) {
                 float movementFactor = e.markSlow > 0 ? .5f : e.slowFactor;
@@ -508,7 +515,7 @@ public class DanielSimulator : MonoBehaviour
         if(e.windup>=0) {
             e.windup-=dt;
             if(e.windup<=0) { e.warning.SetActive(false); var s=new Shot(); s.body=Shape(PrimitiveType.Sphere,"Projectile",e.body.transform.position+Vector3.up*.55f,new Vector3(.55f,.55f,.55f),new Color(1,.35f,.20f),arena.transform); s.velocity=e.direction*8; shots.Add(s); e.windup=-1; e.timer=e.slow>0?2.8f:1.8f; }
-        } else if(e.timer<=0 && ultimateWindup<=0 && seesPlayer) {
+        } else if(e.timer<=0 && !IsUntargetable && seesPlayer) {
             Vector3 aim=player.transform.position-e.body.transform.position; aim.y=0; e.direction=aim.sqrMagnitude>.01f?aim.normalized:Vector3.forward; e.windup=.85f;
             e.warning.transform.position=e.body.transform.position+e.direction*6+Vector3.up*.025f; e.warning.transform.rotation=Quaternion.LookRotation(e.direction); e.warning.transform.localScale=new Vector3(.75f,.025f,12); e.warning.SetActive(true);
         }
@@ -614,17 +621,27 @@ public class DanielSimulator : MonoBehaviour
     }
 
     void ExitUltimate() {
+        ultimateExitFrom = player.transform.position;
+        ultimateExitTo = ultimateExitFrom;
+        destination = ultimateExitFrom;
         if(ultimateTarget!=null) {
             Vector3 exit=MouseWorld()-ultimateTarget.body.transform.position; exit.y=0; if(exit.sqrMagnitude<.01f) exit=Vector3.forward; exit.Normalize();
             DanielSkillVfx.ExitSlash(ultimateTarget.body.transform.position,exit);
             skillAudio.Play(DanielSkillAudio.Cue.R_Exit);
             player.transform.rotation=Quaternion.LookRotation(exit); castFacingTime=.35f;
-            player.transform.position=ultimateTarget.body.transform.position+exit*1.5f; destination=player.transform.position;
+            ultimateExitTo=ultimateTarget.body.transform.position+exit*UltimateRange;
             Hurt(ultimateTarget, ultimateExitDamage);
         }
         if(ultimateVfx) ultimateVfx.Stop(); ultimateVfx=null;
-        if(characterAnimation) { characterAnimation.SetHidden(false); characterAnimation.PlayUltimateExit(); }
+        ultimateExitTime=DanielCharacterAnimation.UltimateExitDuration;
+        if(characterAnimation) characterAnimation.PlayUltimateExit();
         ultimateTarget=null; ultimateTime=0; Show("걸작 종료!");
+    }
+    void CancelUltimateExit() {
+        if(ultimateExitTime<=0) return;
+        ultimateExitTime=0;
+        castFacingTime=0;
+        if(characterAnimation) characterAnimation.CancelUltimateExit();
     }
     void Cast(int index) {
         if(ultimateWindup>0) return;
@@ -632,8 +649,10 @@ public class DanielSimulator : MonoBehaviour
         if(index==1) { foreach(var e in enemies) if(e.mark>0) { Show("영감 표식이 사라진 뒤 다시 사용할 수 있습니다."); return; } }
         if(index==2 && (shadowBuff>0 || dashTime>0)) { Show("그림자 이동이 아직 지속 중입니다."); return; }
         if(cooldown[index]>0) { Show("아직 스킬을 사용할 수 없습니다."); return; }
-        Vector3 mouse=MouseWorld(); Vector3 aim=mouse-player.transform.position; aim.y=0; if(aim.sqrMagnitude<.01f) aim=player.transform.forward; aim.Normalize(); player.transform.rotation=Quaternion.LookRotation(aim);
+        Vector3 mouse=MouseWorld(); Vector3 aim=mouse-player.transform.position; aim.y=0; if(aim.sqrMagnitude<.01f) aim=player.transform.forward; aim.Normalize();
         if(index==0) {
+            CancelUltimateExit();
+            player.transform.rotation=Quaternion.LookRotation(aim);
             stealth = 0;
             qCastLevel = qLevel;
             qCastAttackPower = attackPower;
@@ -649,10 +668,14 @@ public class DanielSimulator : MonoBehaviour
         if(index==1) {
             Enemy target=EnemyAtCursor();
             if(target==null || Vector3.Distance(target.body.transform.position,player.transform.position)>WRange) { Show("W: 사거리 안의 적에게 커서를 올리세요."); return; }
+            CancelUltimateExit();
+            player.transform.rotation=Quaternion.LookRotation(aim);
             ApplyMark(target);
             return;
         }
         if(index==2) {
+            CancelUltimateExit();
+            player.transform.rotation=Quaternion.LookRotation(aim);
             attackTarget=null; dashFrom=player.transform.position; dashTo=dashFrom+aim*ShadowDistance; dashTo.x=Mathf.Clamp(dashTo.x,-11.8f,11.8f); dashTo.z=Mathf.Clamp(dashTo.z,-8.8f,8.8f);
             if(characterAnimation) characterAnimation.PlayDash(); castFacingTime=DashTravel+.1f;
             DanielSkillVfx.SmokeBurst(dashFrom,aim); DanielSkillVfx.DashTrail(dashFrom,dashTo); DanielSkillVfx.SonicBoom(dashFrom,dashTo,DashTravel);
@@ -663,6 +686,8 @@ public class DanielSimulator : MonoBehaviour
         }
         Enemy targetR=EnemyAtCursor();
         if(targetR==null || targetR.boss || targetR.recentDamage<=0 || Vector3.Distance(targetR.body.transform.position,player.transform.position)>UltimateRange) { Show("R: 최근 4초 안에 피해를 준 가까운 적에게 사용하세요."); return; }
+        CancelUltimateExit();
+        player.transform.rotation=Quaternion.LookRotation(aim);
         ultimateTickDamage = UltimateTickDamage;
         ultimateExitDamage = UltimateExitDamage;
         cooldown[3]=RCooldown[rLevel - 1]; attackTarget=null; stealth=0; ultimateTarget=targetR; ultimateWindup=UltimateWindupDuration; latchFrom=player.transform.position;
