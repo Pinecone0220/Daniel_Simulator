@@ -56,6 +56,8 @@ public class DanielSimulator : MonoBehaviour
     static readonly float[] DaggerCooldown = { 30, 25, 20 };
     const float DaggerRange = 3f, DaggerHasteDuration = 1f, DaggerRecastDuration = 3f;
     int weaponMastery = 5, daggerRank;
+    int practiceTargetHp = 160, practiceBossHp = 1000;
+    bool practiceSettingsOpen = true, practiceBossUltimate;
     float skillAmplification, daggerWindow, daggerCooldown;
     static readonly string[] SkillKeys = { "Q", "W", "E", "R", "D" };
     static readonly string[] SkillNames = { "그림자 가위", "영감 표식", "그림자 이동", "걸작", "망토와 단검" };
@@ -320,13 +322,18 @@ public class DanielSimulator : MonoBehaviour
         Enemy e = new Enemy { boss = boss, timer = 1.4f + offset };
         e.body = new GameObject(boss ? "Training boss" : "Training target");
         e.body.transform.position = position;
-        if (boss) { e.hp = e.maxHp = 1000; }
+        if (mode == Mode.Free) e.hp = e.maxHp = boss ? practiceBossHp : practiceTargetHp;
+        else if (boss) e.hp = e.maxHp = 1000;
         Transform savedLL=leftLeg, savedRL=rightLeg, savedLA=leftArm, savedRA=rightArm;
         BuildFighter(e.body.transform, false); leftLeg=savedLL; rightLeg=savedRL; leftArm=savedLA; rightArm=savedRA;
         BuildOutline(e);
         e.renderers = e.body.GetComponentsInChildren<Renderer>(true);
         e.warning=Shape(PrimitiveType.Cube,"Attack telegraph",Vector3.zero,new Vector3(.65f,.035f,1),new Color(.9f,.29f,.23f),arena.transform); e.warning.SetActive(false); enemies.Add(e);
     }
+    bool IsUltimateTarget(Enemy target) =>
+        target != null && !target.dead && target.recentDamage > 0 &&
+        (!target.boss || (mode == Mode.Free && practiceBossUltimate));
+
     bool CanSeeEnemy(Enemy target)
     {
         Vector3 position = target.body.transform.position;
@@ -451,7 +458,7 @@ public class DanielSimulator : MonoBehaviour
         if(rangeVfx) { bool inside=false; foreach(var e in enemies) if(!e.dead && CanSeeEnemy(e) && Vector3.Distance(e.body.transform.position,player.transform.position)<=ShadowRange) inside=true; rangeVfx.SetRangeHighlight(inside); }
         // R window: chevrons point at every target damaged in the last 4 s; dark out of range, bright inside it.
         foreach(var e in enemies) {
-            bool link=!e.dead && !e.boss && CanSeeEnemy(e) && e.recentDamage>0 && cooldown[3]<=0 && ultimateTime<=0 && ultimateWindup<=0;
+            bool link=IsUltimateTarget(e) && CanSeeEnemy(e) && cooldown[3]<=0 && ultimateTime<=0 && ultimateWindup<=0;
             if(link && !e.ultimateLink) e.ultimateLink=DanielSkillVfx.CreateUltimateLink(player.transform,e.body.transform);
             else if(!link && e.ultimateLink) { e.ultimateLink.Stop(); e.ultimateLink=null; }
             if(e.ultimateLink) e.ultimateLink.SetRangeHighlight(Vector3.Distance(e.body.transform.position,player.transform.position)<=UltimateRange);
@@ -775,7 +782,7 @@ public class DanielSimulator : MonoBehaviour
             dashTime=DashTravel; afterimageTimer=0; shadowBuff=ShadowDuration; stealth=EStealth[eLevel - 1]; stealthUses++; Show("그림자 이동: 다음 기본 공격으로 적의 반대편에 이동합니다."); return;
         }
         Enemy targetR=EnemyAtCursor();
-        if(targetR==null || targetR.boss || targetR.recentDamage<=0 || Vector3.Distance(targetR.body.transform.position,player.transform.position)>UltimateRange) { Show("R: 최근 4초 안에 피해를 준 가까운 적에게 사용하세요."); return; }
+        if(!IsUltimateTarget(targetR) || Vector3.Distance(targetR.body.transform.position,player.transform.position)>UltimateRange) { Show("R: 최근 4초 안에 피해를 준 가까운 적에게 사용하세요."); return; }
         CancelUltimateExit();
         player.transform.rotation=Quaternion.LookRotation(aim);
         ultimateTickDamage = UltimateTickDamage;
@@ -1041,28 +1048,43 @@ public class DanielSimulator : MonoBehaviour
 
     void DrawPracticeSettings()
     {
-        Box(new Rect(960, 182, 290, 365), new Color(.025f, .045f, .055f, .91f));
-        qLevel = DrawPracticeValue("Q 레벨", qLevel, 191, 1, 1, QDamage.Length);
-        wLevel = DrawPracticeValue("W 레벨", wLevel, 219, 1, 1, WDamage.Length);
-        eLevel = DrawPracticeValue("E 레벨", eLevel, 247, 1, 1, EDamage.Length);
-        rLevel = DrawPracticeValue("R 레벨", rLevel, 275, 1, 1, RTickDamage.Length);
-        attackPower = DrawPracticeValue("공격력", attackPower, 303, 5, 0, float.MaxValue);
-        GUI.Label(new Rect(973, 337, 260, 23), $"추가 공격력 {BonusAttackPower:0.#} · Q 공속 +{QAttackSpeedBonus[qLevel - 1]:P0}", small);
+        bool bossAlive = enemies.Exists(e => e.boss && !e.dead);
+        float panelHeight = practiceSettingsOpen ? (bossAlive ? 298 : 334) : 38;
+        Box(new Rect(960, 182, 290, panelHeight), new Color(.025f, .045f, .055f, .91f));
+        if (Button(new Rect(973, 187, 263, 28), practiceSettingsOpen ? "연습 설정  ▴" : "연습 설정  ▾"))
+            practiceSettingsOpen = !practiceSettingsOpen;
+        if (!practiceSettingsOpen) return;
 
-        int qRank = qLevel - 1;
-        GUI.Label(new Rect(973, 359, 265, 22),
-            $"Q 피해 {QDamage[qRank] + 1.1f * attackPower:0.#} / 중앙 {QCenterDamage[qRank] + 1.4f * attackPower:0.#} · {QCooldown[qRank]:0}초", small);
-        GUI.Label(new Rect(973, 381, 265, 22),
-            $"W 축적 {MarkStoreRatio:P1} · 폭발 {MarkSkillDamage:0.#} + 축적", small);
-        GUI.Label(new Rect(973, 403, 265, 22),
-            $"E 추가 {ShadowStrikeDamage:0.#} · 은신 {EStealth[eLevel - 1]:0.#}초 · {ECooldown[eLevel - 1]:0}초", small);
-        GUI.Label(new Rect(973, 425, 265, 22),
-            $"R 틱 {UltimateTickDamage:0.#} · 마지막 {UltimateExitDamage:0.#} · {RCooldown[rLevel - 1]:0}초", small);
-        weaponMastery = DrawPracticeValue("단검 숙련도", weaponMastery, 451, 1, 0, 15);
-        skillAmplification = DrawPracticeValue("스킬 증폭", skillAmplification, 479, 5, 0, float.MaxValue);
-        if (!enemies.Exists(e => e.boss && !e.dead) &&
-            Button(new Rect(973, 507, 263, 33), "연습 보스 추가"))
+        qLevel = DrawPracticeValue("Q 레벨", qLevel, 223, 1, 1, QDamage.Length);
+        wLevel = DrawPracticeValue("W 레벨", wLevel, 248, 1, 1, WDamage.Length);
+        eLevel = DrawPracticeValue("E 레벨", eLevel, 273, 1, 1, EDamage.Length);
+        rLevel = DrawPracticeValue("R 레벨", rLevel, 298, 1, 1, RTickDamage.Length);
+        attackPower = DrawPracticeValue("공격력", attackPower, 323, 5, 0, float.MaxValue);
+        weaponMastery = DrawPracticeValue("단검 숙련도", weaponMastery, 348, 1, 0, 15);
+        skillAmplification = DrawPracticeValue("스킬 증폭", skillAmplification, 373, 5, 0, float.MaxValue);
+
+        int targetHp = DrawPracticeValue("표적 최대 체력", practiceTargetHp, 398, 50, 10, 1000000);
+        int bossHp = DrawPracticeValue("보스 최대 체력", practiceBossHp, 423, 100, 100, 1000000);
+        if (targetHp != practiceTargetHp) SetPracticeEnemyHp(false, targetHp);
+        if (bossHp != practiceBossHp) SetPracticeEnemyHp(true, bossHp);
+
+        if (Button(new Rect(973, 453, 263, 26), practiceBossUltimate ? "보스 대상 R 허용" : "보스 대상 R 금지"))
+            practiceBossUltimate = !practiceBossUltimate;
+        if (!bossAlive && Button(new Rect(973, 485, 263, 26), "연습 보스 추가"))
             AddEnemy(new Vector3(3, 0, -5), 1f, boss: true);
+    }
+
+    void SetPracticeEnemyHp(bool boss, int maxHp)
+    {
+        if (boss) practiceBossHp = maxHp;
+        else practiceTargetHp = maxHp;
+
+        foreach (var enemy in enemies)
+        {
+            if (enemy.dead || enemy.boss != boss) continue;
+            enemy.hp = Mathf.Clamp01(enemy.hp / enemy.maxHp) * maxHp;
+            enemy.maxHp = maxHp;
+        }
     }
 
     int DrawPracticeValue(string name, int value, float y, int step, int min, int max)
