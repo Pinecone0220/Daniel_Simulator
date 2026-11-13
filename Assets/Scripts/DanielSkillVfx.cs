@@ -8,8 +8,9 @@ using UnityEngine.Rendering;
 /// </summary>
 public sealed class DanielSkillVfx : MonoBehaviour
 {
-    enum Kind { Scissors, Mark, MarkBurst, Smoke, Trail, Ultimate, Slash, Ghost, Ping, Range, Latch, Stream, Veil, Boom, Link, DaggerCloak, DaggerCut, FireTrail }
+    enum Kind { Scissors, Mark, MarkBurst, Smoke, Trail, Ultimate, Slash, Ghost, Ping, Range, Latch, Stream, Veil, Boom, Link, DaggerCloak, DaggerCut, FireTrail, UltimateWake }
     Kind kind;
+    DanielSkillVfx ultimateWake;
     float age, duration, windup, markProgress, height;
     bool markReady, rangeHighlight;
     Transform linkTarget;
@@ -347,6 +348,7 @@ public sealed class DanielSkillVfx : MonoBehaviour
         if (!target) return null;
         var fx = New(Kind.Ultimate, target.position + Vector3.up*.1f, Vector3.forward, 2.6f);
         fx.follow = target;
+        fx.ultimateWake = BeginUltimateWake(target);
         fx.fan = fx.MeshPart("Shadow pool", fx.SectorMesh(.85f,360), fx.dark, fx.transform).transform;
         fx.Circle("Shadow ring", Vector3.up*.02f,.70f,.055f,fx.purple,fx.transform,false);
         fx.Circle("Inner ring", Vector3.up*.03f,.36f,.035f,fx.bright,fx.transform,false);
@@ -368,7 +370,48 @@ public sealed class DanielSkillVfx : MonoBehaviour
     {
         direction.y=0; if(direction.sqrMagnitude>.001f) exitDirection=direction.normalized;
     }
-    public void Stop() { if (this) Destroy(gameObject); }
+    static DanielSkillVfx BeginUltimateWake(Transform target)
+    {
+        var fx = New(Kind.UltimateWake, target.position, Vector3.forward, 0f);
+        fx.follow = target;
+        fx.AddWakeRibbon("Shadow ribbon", .86f, .53f, .12f, new Color(.20f, .035f, .37f, .78f));
+        fx.AddWakeRibbon("Violet ribbon", .45f, .46f, .20f, new Color(.76f, .22f, 1f, .95f));
+        fx.AddWakeRibbon("Bright core", .13f, .37f, .25f, new Color(.96f, .70f, 1f, .92f));
+        return fx;
+    }
+
+    void AddWakeRibbon(string name, float width, float lifetime, float elevation, Color color)
+    {
+        var ribbon = new GameObject(name).transform;
+        ribbon.SetParent(transform, false);
+        ribbon.localPosition = Vector3.up * elevation;
+        var trail = ribbon.gameObject.AddComponent<TrailRenderer>();
+        trail.sharedMaterial = MakeMaterial(Color.white);
+        trail.time = lifetime;
+        trail.minVertexDistance = .065f;
+        trail.widthMultiplier = width;
+        trail.widthCurve = new AnimationCurve(new Keyframe(0f, 1f), new Keyframe(.45f, .66f), new Keyframe(1f, 0f));
+        trail.colorGradient = new Gradient
+        {
+            colorKeys = new[] { new GradientColorKey(color, 0f), new GradientColorKey(color * .65f, 1f) },
+            alphaKeys = new[] { new GradientAlphaKey(color.a, 0f), new GradientAlphaKey(color.a * .62f, .48f), new GradientAlphaKey(0f, 1f) }
+        };
+        trail.shadowCastingMode = ShadowCastingMode.Off;
+        trail.receiveShadows = false;
+        trail.numCornerVertices = 3;
+        trail.numCapVertices = 3;
+    }
+
+    public void Stop()
+    {
+        if (ultimateWake)
+        {
+            ultimateWake.follow = null;
+            ultimateWake.duration = ultimateWake.age + .55f;
+            foreach (var trail in ultimateWake.GetComponentsInChildren<TrailRenderer>()) trail.emitting = false;
+        }
+        Destroy(gameObject);
+    }
 
     /// <summary>Clears standalone effects when the practice round is reset.</summary>
     public static void ClearAll()
@@ -779,6 +822,8 @@ public sealed class DanielSkillVfx : MonoBehaviour
                 motes[i].Rotate(31*dt,47*dt,0);
             }
         }
+        if (kind == Kind.UltimateWake && follow)
+            transform.position = follow.position;
         if(kind==Kind.Ultimate)
         {
             if(!follow) { Destroy(gameObject); return; }
