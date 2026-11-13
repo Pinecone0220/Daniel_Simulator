@@ -75,7 +75,7 @@ public class DanielSimulator : MonoBehaviour
     readonly EnemySettings practiceTarget = new EnemySettings(1000), practiceBoss = new EnemySettings(1000);
     int practiceTab;
     bool practiceNight;
-    int passiveLevel = 1;
+    int passiveLevel = 1, danielLevel = 1;
     static readonly float[] PassiveSight = { .14f, .17f, .20f };
     static readonly float[] PassiveSpeed = { .02f, .04f, .06f };
     bool IsNight => mode == Mode.Free && practiceNight;
@@ -99,6 +99,7 @@ public class DanielSimulator : MonoBehaviour
     Texture2D cooldownSweep, danielPortrait;
     const int PassiveSlot = 4, WeaponSlot = 5;
     const float SkillSlotX = 425f, SkillSlotY = 607f, SkillSlotSize = 48f, SkillSlotSpacing = 55f;
+    const float HudScale = .82f;
     static readonly Rect CombatHud = new Rect(66, 600, 1148, 119);
     static readonly Color HudBackground = new Color(.075f, .109f, .145f, .98f);
     static readonly Color HudSlot = new Color(.036f, .054f, .074f, .98f);
@@ -1090,9 +1091,7 @@ public class DanielSimulator : MonoBehaviour
         Box(new Rect(25,84,370,116),new Color(.025f,.045f,.055f,.91f)); GUI.Label(new Rect(43,96,340,30),title,label); GUI.Label(new Rect(43,126,330,24),goal,small); GUI.Label(new Rect(43,155,335,30),"피격 " + hits + "   ·   회피 " + dodged + "   ·   처치 " + kills, label);
         if(shadowBuff>0) GUI.Label(new Rect(270,220,280,30),"그림자 평타 " + shadowBuff.ToString("0.0") + "초" + (stealth>0?" · 은신":""),label);
         }
-        DrawCombatHud();
-        int hoveredSkill = DrawSkillBar();
-        GUI.Label(new Rect(70,554,362,44),"우클릭 이동·공격 · A 공격 · S 정지\nY 시점 고정/해제 · Space 내 캐릭터 · 휠 확대/축소 · ESC 배치·삭제 취소",small);
+        int hoveredSkill = DrawScaledHud();
         if(Button(new Rect(1095,85,155,38),"다시 시작")) ResetGame(mode);
         if(Button(new Rect(1095,130,155,38),"메인화면으로")) ResetGame(Mode.Menu);
         if (mode == Mode.Free && !ended) { DrawPracticeSettings(); HandleTargetEdit(sx, sy); }
@@ -1152,6 +1151,18 @@ public class DanielSimulator : MonoBehaviour
         return speed;
     }
 
+    static float HudTop => CombatHud.yMax - CombatHud.height * HudScale;
+
+    int DrawScaledHud()
+    {
+        Matrix4x4 matrix = GUI.matrix;
+        GUIUtility.ScaleAroundPivot(Vector2.one * HudScale, new Vector2(640f, CombatHud.yMax));
+        DrawCombatHud();
+        int hovered = DrawSkillBar();
+        GUI.matrix = matrix;
+        return hovered;
+    }
+
     void DrawCombatHud()
     {
         Box(CombatHud, HudBackground);
@@ -1177,7 +1188,9 @@ public class DanielSimulator : MonoBehaviour
 
         Box(new Rect(273, 602, 141, 115), new Color(.047f, .073f, .099f, .98f));
         if (danielPortrait) GUI.DrawTexture(new Rect(281, 600, 116, 116), danielPortrait, ScaleMode.ScaleToFit);
-        DrawHudSlot(new Rect(276, 685, 36, 28), IsNight ? "밤" : "낮");
+        Box(new Rect(276, 685, 36, 28), new Color(.22f, .38f, .19f));
+        Box(new Rect(278, 687, 32, 24), HudSlot);
+        GUI.Label(new Rect(278, 687, 32, 24), danielLevel.ToString(), skillKeyStyle);
 
         var healthFrame = new Rect(SkillSlotX, 680, 269, 19);
         Box(healthFrame, HudEdge);
@@ -1202,9 +1215,9 @@ public class DanielSimulator : MonoBehaviour
     void DrawHudStat(float x, float y, string name, string value, Color color)
     {
         GUI.color = color;
-        GUI.Label(new Rect(x, y, 74, 14), name, small);
+        GUI.Label(new Rect(x, y - 2, 74, 18), name, skillKeyStyle);
         GUI.color = Color.white;
-        GUI.Label(new Rect(x, y + 11, 74, 18), value, skillTooltipTitle);
+        GUI.Label(new Rect(x, y + 10, 74, 18), value, skillKeyStyle);
     }
 
     void DrawHudSlot(Rect slot, string key)
@@ -1373,8 +1386,28 @@ public class DanielSimulator : MonoBehaviour
             var key = new Rect(rect.x + 2, rect.yMax - 19, 17, 17);
             Box(key, new Color(.02f, .03f, .05f, .92f));
             GUI.Label(key, SkillKeys[i], skillKeyStyle);
+            DrawSkillRank(rect, i);
         }
         return hovered;
+    }
+
+    void DrawSkillRank(Rect rect, int index)
+    {
+        int rank, maximum;
+        switch (index)
+        {
+            case 0: rank = qLevel; maximum = QDamage.Length; break;
+            case 1: rank = wLevel; maximum = WDamage.Length; break;
+            case 2: rank = eLevel; maximum = EDamage.Length; break;
+            case 3: rank = rLevel; maximum = RTickDamage.Length; break;
+            case PassiveSlot: rank = passiveLevel; maximum = PassiveSight.Length; break;
+            default: rank = weaponMastery / 5; maximum = DaggerDamage.Length; break;
+        }
+
+        float width = rect.width / maximum;
+        for (int i = 0; i < maximum; i++)
+            Box(new Rect(rect.x + i * width, rect.yMax + 4, width - 2f, 4f),
+                i < rank ? new Color(.98f, .76f, .33f) : HudEdge);
     }
 
     void DrawCooldownSweep(Rect rect, float fraction, Color color)
@@ -1428,8 +1461,9 @@ public class DanielSimulator : MonoBehaviour
 
         const float width = 350;
         float bodyHeight = label.CalcHeight(new GUIContent(details), width - 24);
-        float x = Mathf.Clamp(SkillSlotPosition(index) + SkillSlotSize / 2f - width / 2f, 12, 1268 - width);
-        float y = CombatHud.y - bodyHeight - 58;
+        float slotCenter = 640f + (SkillSlotPosition(index) + SkillSlotSize / 2f - 640f) * HudScale;
+        float x = Mathf.Clamp(slotCenter - width / 2f, 12, 1268 - width);
+        float y = HudTop - bodyHeight - 58;
         Box(new Rect(x - 1, y - 1, width + 2, bodyHeight + 48), new Color(.29f, .38f, .47f));
         Box(new Rect(x, y, width, bodyHeight + 46), new Color(.045f, .065f, .095f, .98f));
         GUI.Label(new Rect(x + 12, y + 8, width - 24, 24), $"{SkillKeys[index]}  {SkillNames[index]}", skillTooltipTitle);
@@ -1448,7 +1482,7 @@ public class DanielSimulator : MonoBehaviour
     }
 
     static readonly string[] PracticeTabs = { "다니엘", "일반 적", "보스" };
-    Rect PracticePanelRect => new Rect(960, 182, 290, practiceSettingsOpen ? (practiceTab == 1 ? 385 : practiceTab == 0 ? 358 : 320) : 38);
+    Rect PracticePanelRect => new Rect(960, 182, 290, practiceSettingsOpen ? (practiceTab == 1 ? 385 : practiceTab == 0 ? 383 : 320) : 38);
 
     void DrawPracticeSettings()
     {
@@ -1485,6 +1519,7 @@ public class DanielSimulator : MonoBehaviour
             passiveLevel = DrawPracticeValue("패시브 레벨", passiveLevel, 474, 1, 1, PassiveSight.Length);
             if (Button(new Rect(973, 504, 263, 28), IsNight ? "시간대  ·  밤" : "시간대  ·  낮"))
                 practiceNight = !practiceNight;
+            danielLevel = DrawPracticeValue("다니엘 레벨", danielLevel, 535, 1, 1, 20);
             return;
         }
 
@@ -1571,7 +1606,7 @@ public class DanielSimulator : MonoBehaviour
 
         Event input = Event.current;
         Vector2 point = input.mousePosition;
-        bool overHud = point.y < 64 || point.y >= CombatHud.y || PracticePanelRect.Contains(point) ||
+        bool overHud = point.y < 64 || point.y >= HudTop || PracticePanelRect.Contains(point) ||
             new Rect(1095, 85, 155, 83).Contains(point) || new Rect(25, 84, 262, 114).Contains(point);
         if (input.type == EventType.MouseDown && input.button == 0 && !overHud)
         {

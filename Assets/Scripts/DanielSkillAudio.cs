@@ -16,6 +16,7 @@ public sealed class DanielSkillAudio : MonoBehaviour
     AudioSource oneShots;
     AudioSource charge;
     AudioSource ultimate;
+    const float SkillVolumeScale = .65f;
     bool alternateAttack;
 
     void Awake()
@@ -28,6 +29,8 @@ public sealed class DanielSkillAudio : MonoBehaviour
         oneShots = CreateSource();
         charge = CreateSource();
         ultimate = CreateSource();
+        ultimate.volume *= SkillVolumeScale;
+        charge.volume *= SkillVolumeScale;
         ultimate.clip = Resources.Load<AudioClip>("SkillAudio/R_Full");
     }
 
@@ -54,7 +57,8 @@ public sealed class DanielSkillAudio : MonoBehaviour
         else
         {
             if (cue == Cue.W_Ready) CancelCharge();
-            oneShots.PlayOneShot(clip, volumeScale);
+            bool isSkill = cue != Cue.Attack_1 && cue != Cue.Attack_2 && cue != Cue.Step_1 && cue != Cue.Step_2;
+            oneShots.PlayOneShot(clip, isSkill ? volumeScale * SkillVolumeScale : volumeScale);
         }
     }
 
