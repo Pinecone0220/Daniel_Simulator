@@ -1068,13 +1068,15 @@ public class DanielSimulator : MonoBehaviour
             bool isHovered = rect.Contains(cursor);
             if (isHovered) hovered = i;
             bool locked = i == 4 && weaponMastery < 5 && active <= 0;
-            Color edge = active > 0 || (i == 3 && IsUntargetable) ? new Color(.40f, .90f, 1f) : new Color(.27f, .33f, .39f);
+            Color edge = new Color(.27f, .33f, .39f);
             Box(new Rect(rect.x - 2, rect.y - 2, 68, 68), isHovered ? Color.white : edge);
             Box(rect, new Color(.045f, .06f, .09f));
             if (skillIcons[i]) GUI.DrawTexture(rect, skillIcons[i]);
             if (locked) Box(rect, new Color(.02f, .03f, .06f, .7f));
 
             bool showTimer = active <= 0 || i == 3 || i == 4;
+            if (!showTimer || (i == 3 && IsUntargetable && active <= 0))
+                Box(rect, new Color(.015f, .02f, .04f, .77f));
             float shownTime = active > 0 ? active : remaining;
             if (!locked && showTimer && shownTime > 0)
             {
