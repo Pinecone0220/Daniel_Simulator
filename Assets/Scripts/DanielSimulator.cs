@@ -518,14 +518,14 @@ public class DanielSimulator : MonoBehaviour
         foreach(var e in enemies) { if(e.dead || !CanSeeEnemy(e)) continue; Vector3 screen=cam.WorldToScreenPoint(e.body.transform.position+Vector3.up); float d=Vector2.Distance(point,new Vector2(screen.x,screen.y)); if(screen.z>0 && d<distance) { distance=d; best=e; } }
         return best;
     }
-    void Hurt(Enemy e, float amount, float extraSkillDamage = 0f)
+    void Hurt(Enemy e, float amount, float extraSkillDamage = 0f, bool canDetonateMark = true)
     {
         if (e == null || e.dead) return;
         e.visionDebuff = 0;
         float damage = amount + extraSkillDamage;
         if (e.mark > WReadyTime)
             e.storedDamage += damage * e.markStoreRatio;
-        else if (e.mark > 0)
+        else if (e.mark > 0 && canDetonateMark)
         {
             // The arena has no defense stat. Both the stored true damage and skill damage go directly to HP.
             float trueDamage = e.storedDamage;
@@ -607,7 +607,7 @@ public class DanielSimulator : MonoBehaviour
                 nextUltimateTick++;
                 skillAudio.Play(DanielSkillAudio.Cue.R_Tick);
                 if (!ultimateTarget.dead)
-                    Hurt(ultimateTarget, ultimateTickDamage);
+                    Hurt(ultimateTarget, ultimateTickDamage, canDetonateMark: false);
             }
         }
         if (ultimateTime <= 0 || ultimateTarget == null) ExitUltimate();
@@ -685,7 +685,23 @@ public class DanielSimulator : MonoBehaviour
         target.markSight = DanielSkillVfx.CreateRange(target.body.transform, MarkSightRadius);
     }
     void Show(string message) { } // on-screen notices are disabled
-    void Finish(bool success) { skillAudio.CancelCharge(); if(characterAnimation) { characterAnimation.SetMoving(0); characterAnimation.SetStealth(false); characterAnimation.SetHidden(false); } ended=true; won=success; foreach(var e in enemies) if(e.warning) e.warning.SetActive(false); }
+    void Finish(bool success)
+    {
+        skillAudio.CancelCharge();
+        if (characterAnimation)
+        {
+            characterAnimation.SetMoving(0);
+            characterAnimation.SetStealth(false);
+            characterAnimation.SetHidden(false);
+        }
+        ended = true;
+        won = success;
+        foreach (var e in enemies)
+        {
+            if (health <= 0 && e.mark > 0) ClearMark(e);
+            if (e.warning) e.warning.SetActive(false);
+        }
+    }
     void InitStyles() {
         if(label!=null) return;
         label=new GUIStyle(GUI.skin.label){font=font,fontSize=16,normal={textColor=ink},wordWrap=true};
