@@ -8,7 +8,7 @@ using UnityEngine.Rendering;
 /// </summary>
 public sealed class DanielSkillVfx : MonoBehaviour
 {
-    enum Kind { Scissors, Mark, MarkBurst, Smoke, Trail, Ultimate, Slash, Ghost, Ping, Range, Latch, Stream, Veil, Boom, Link, DaggerCloak, DaggerCut, FireTrail, UltimateWake }
+    enum Kind { Scissors, Mark, MarkBurst, Smoke, Trail, Ultimate, Slash, Ghost, Ping, Range, Latch, Stream, Veil, Boom, Link, DaggerCloak, DaggerCut, FireTrail, UltimateWake, TruthBlades, TruthImpact }
     Kind kind;
     DanielSkillVfx ultimateWake;
     float age, duration, windup, markProgress, height;
@@ -517,19 +517,135 @@ public sealed class DanielSkillVfx : MonoBehaviour
         return fx;
     }
 
-    public static void TruthBlades(Vector3 position, Vector3 direction, float radius, bool upgraded)
+    const float TruthSweepStart = DanielSimulator.TruthFirstStrike;
+    const float TruthOrbitDuration = 12f / 30f;
+    static readonly Color TruthBlue = new Color(.22f, .47f, 1f, .76f);
+    static readonly Color TruthEdge = new Color(.72f, .93f, 1f, .98f);
+    static readonly Color TruthGround = new Color(.22f, .31f, .95f, .14f);
+
+    public static void TruthBlades(Transform caster, float radius, bool upgraded)
     {
-        var fx = New(Kind.Slash, position + Vector3.up * .18f, direction, .40f);
-        fx.extraColor = new Color(.10f, .72f, 1f, .88f);
-        fx.extra = fx.MakeMaterial(fx.extraColor);
-        fx.Circle("Truth blade radius", Vector3.zero, radius, .045f, fx.extra, fx.transform, false);
-        fx.Arc("Truth blade", radius * .92f, 155f, .17f, fx.extra, fx.transform);
-        if (upgraded)
+        var fx = New(Kind.TruthBlades, caster.position + Vector3.up * .075f, caster.forward, upgraded ? .94f : .76f);
+        fx.transform.SetParent(caster, true);
+        fx.extraColor = TruthBlue;
+        fx.extra = fx.MakeMaterial(TruthBlue);
+        fx.cyan = fx.MakeMaterial(TruthEdge);
+        fx.daggerEdge = fx.MakeMaterial(TruthGround);
+        fx.MeshPart("Blue field", fx.SectorMesh(radius, 360), fx.daggerEdge, fx.transform);
+        fx.Circle("Field edge", Vector3.up * .025f, radius, .034f, fx.extra, fx.transform, false);
+
+        fx.height = radius;
+        fx.fan = new GameObject("Blade orbit").transform;
+        fx.fan.SetParent(fx.transform, false);
+        Mesh bladeMesh = fx.CreateTruthBladeMesh();
+        int passes = upgraded ? 2 : 1;
+        for (int i = 0; i < passes; i++)
         {
-            var second = new GameObject("Module blade").transform;
-            second.SetParent(fx.transform, false);
-            second.localRotation = Quaternion.Euler(0, 180f, 0);
-            fx.Arc("Module blade edge", radius * .86f, 150f, .14f, fx.extra, second);
+            var spoke = new GameObject("Blade axis").transform;
+            spoke.SetParent(fx.fan, false);
+            spoke.localRotation = Quaternion.Euler(0f, i * 180f, 0f);
+            var blade = fx.MeshPart("Orbiting blade", bladeMesh, fx.cyan, spoke).transform;
+            fx.Line("Blade ridge", new[] { new Vector3(0f,.025f,-.39f), new Vector3(0f,.065f,.62f) },
+                .058f, fx.extra, blade);
+            fx.motes.Add(blade);
+
+            var wake = new GameObject("Orbit wake").transform;
+            wake.SetParent(spoke, false);
+            fx.TruthWakeLine(wake, radius * .89f, 142f, .16f, fx.extra);
+            fx.TruthWakeLine(wake, radius * .92f, 109f, .068f, fx.cyan);
+            fx.TruthWakeLine(wake, radius * .73f, 104f, .052f, fx.extra);
+            fx.rings.Add(wake);
+        }
+        fx.Sample(0f);
+    }
+
+    public static void TruthBladeImpact(Vector3 position, bool moduleBlade)
+    {
+        var fx = New(Kind.TruthImpact, position + Vector3.up * .86f, Vector3.forward, .22f);
+        fx.extraColor = new Color(.59f, .49f, 1f, .85f);
+        fx.extra = fx.MakeMaterial(fx.extraColor);
+        fx.cyan = fx.MakeMaterial(TruthEdge);
+        var spark = new GameObject("Blade impact").transform;
+        spark.SetParent(fx.transform, false);
+        spark.localRotation = Quaternion.Euler(0f, moduleBlade ? 95f : 0f, moduleBlade ? 35f : 0f);
+        fx.Line("Impact slash", new[] { new Vector3(-.48f,-.31f,0f), Vector3.zero, new Vector3(.48f,.31f,0f) },
+            .087f, fx.cyan, spark);
+        fx.Circle("Impact ripple", Vector3.zero, .43f, .05f, fx.extra, spark, true);
+        fx.rings.Add(spark);
+        fx.Sample(0f);
+    }
+
+    Mesh CreateTruthBladeMesh()
+    {
+        var mesh = new Mesh { name = "Truth blade" };
+        mesh.vertices = new[]
+        {
+            new Vector3(0f, 0f, .69f), new Vector3(-.19f, 0f, .02f),
+            new Vector3(-.12f, 0f, -.35f), new Vector3(0f, 0f, -.52f),
+            new Vector3(.12f, 0f, -.35f), new Vector3(.19f, 0f, .02f),
+            new Vector3(0f, .09f, -.05f)
+        };
+        mesh.triangles = new[] { 0, 1, 6, 1, 2, 6, 2, 3, 6, 3, 4, 6, 4, 5, 6, 5, 0, 6 };
+        mesh.RecalculateNormals();
+        ownedMeshes.Add(mesh);
+        return mesh;
+    }
+
+    void TruthWakeLine(Transform parent, float radius, float span, float width, Material material)
+    {
+        var points = new Vector3[25];
+        for (int i = 0; i < points.Length; i++)
+        {
+            float t = i / (float)(points.Length - 1);
+            float angle = -Mathf.Lerp(span, 7f, t) * Mathf.Deg2Rad;
+            points[i] = new Vector3(Mathf.Sin(angle), 0f, Mathf.Cos(angle)) * radius;
+        }
+
+        LineRenderer line = Line("Trailing arc", points, width, material, parent);
+        line.widthCurve = new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(.65f, 1f), new Keyframe(1f, .64f));
+        line.colorGradient = new Gradient
+        {
+            colorKeys = new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
+            alphaKeys = new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(.30f, .42f), new GradientAlphaKey(1f, 1f) }
+        };
+    }
+
+    void SampleTruthBlades()
+    {
+        if (kind == Kind.TruthImpact)
+        {
+            float progress = Mathf.Clamp01(age / .20f);
+            rings[0].localScale = Vector3.one * Mathf.Lerp(.38f, 1.25f, progress) * (1f - progress);
+            Tint(cyan, TruthEdge, 1f - progress);
+            return;
+        }
+
+        float tail = 1f - Mathf.InverseLerp(duration - .20f, duration, age);
+        Tint(cyan, TruthEdge, tail);
+        Tint(daggerEdge, TruthGround, tail * Mathf.Clamp01(age / .09f));
+
+        float elapsed = age - TruthSweepStart;
+        float setup = Mathf.InverseLerp(-TruthSweepStart, 0f, elapsed);
+        float orbit = Mathf.Clamp01(elapsed / TruthOrbitDuration);
+        float angle = -70f + 360f * orbit - (1f - setup) * 55f;
+        fan.localRotation = Quaternion.Euler(0f, angle, 0f);
+
+        float radius = height * Mathf.Lerp(.47f, .92f, setup);
+        float elevation = Mathf.Lerp(2.35f, .49f, setup);
+        float scale = Mathf.SmoothStep(0f, 1.10f, setup * 2f) *
+            (1f - Mathf.InverseLerp(TruthOrbitDuration, TruthOrbitDuration + .10f, elapsed));
+        bool showWake = elapsed >= 0f && elapsed < TruthOrbitDuration + .11f;
+
+        for (int i = 0; i < motes.Count; i++)
+        {
+            Transform blade = motes[i];
+            blade.localPosition = new Vector3(0f, elevation, radius);
+            blade.localRotation = Quaternion.Euler(Mathf.Lerp(65f, 0f, setup), 90f, 12f);
+            blade.localScale = Vector3.one * scale;
+
+            Transform wake = rings[i];
+            wake.localPosition = Vector3.up * elevation;
+            wake.localScale = showWake ? Vector3.one : Vector3.zero;
         }
     }
 
@@ -966,6 +1082,7 @@ public sealed class DanielSkillVfx : MonoBehaviour
             }
         }
         if(kind==Kind.Ping) flash.localScale=Vector3.one*Mathf.Lerp(.25f,1,fade);
+        if (kind == Kind.TruthBlades || kind == Kind.TruthImpact) SampleTruthBlades();
         if(kind==Kind.Slash) transform.localScale=Vector3.one*(.8f+.3f*(1-fade));
         Tint(dark,ShadowColor,fade); Tint(purple,VioletColor,fade); Tint(bright,WhiteColor,fade);
         Tint(soft,new Color(.45f,.1f,.65f,.18f),fade);

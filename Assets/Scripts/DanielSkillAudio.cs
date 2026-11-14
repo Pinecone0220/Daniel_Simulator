@@ -6,7 +6,7 @@ public sealed class DanielSkillAudio : MonoBehaviour
     public enum Cue
     {
         Q_Cast, Q_Snap, W_Charge, W_Ready, W_Burst, E_Dash, E_Strike,
-        Attack_1, Attack_2, Step_1, Step_2, D_Cloak, D_Strike, Adriana_Dash
+        Attack_1, Attack_2, Step_1, Step_2, D_Cloak, D_Strike, Adriana_Dash, F_Level1_Miss, F_Level2_Miss, F_Level1_Hit, F_Level2_Hit, F_Level1_Intro, F_Level2_Intro
     }
 
     // R_Full.wav begins at 1.94 s in the reference recording.

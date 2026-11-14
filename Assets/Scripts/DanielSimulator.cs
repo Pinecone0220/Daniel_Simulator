@@ -96,7 +96,11 @@ public class DanielSimulator : MonoBehaviour
     Texture2D editCursor;
     bool practiceSettingsOpen = true, practiceBossUltimate;
     float skillAmplification, daggerWindow, daggerCooldown;
-    int tacticalLevel = 1;
+    int tacticalLevel = 1, truthBladesRank;
+    float truthBladesStartedAt, truthBladesDamage, truthBladesModuleDamage;
+    int truthBladesNextStrike = -1;
+    readonly HashSet<Enemy> truthBladesTargets = new HashSet<Enemy>();
+    internal const float TruthFirstStrike = 8f / 30f, TruthSecondStrikeDelay = 3f / 30f;
     float tacticalCooldown, tacticalCooldownDuration, tacticalHasteTime, tacticalHaste;
     const float TacticalRange = 2.5f, TacticalHasteDuration = 2.5f, TacticalBaseHaste = .20f;
     static readonly float[] TacticalHastePerTarget = { .05f, .10f };
@@ -345,6 +349,8 @@ public class DanielSimulator : MonoBehaviour
         mode=next; ended=false; won=false; health=PlayerMaxHealth; stealth=0; shadowBuff=0; invulnerable=0; elapsed=0; hits=0; dodged=0; kills=0; stealthUses=0; attackTimer=0; ultimateTime=0; ultimateWindup=0; ultimateExitTime=0; stealthTint=0; qDelay=0; qBuffTime=0; qBuffAttacks=0; dashTime=0; nextUltimateTick=0; if(qEffect) Destroy(qEffect); attackTarget=null; ultimateTarget=null;
         daggerWindow = daggerCooldown = 0;
         tacticalCooldown = tacticalHasteTime = 0f;
+        truthBladesNextStrike = -1;
+        truthBladesTargets.Clear();
         for(int i=0;i<4;i++) cooldown[i]=0;
         foreach(var e in enemies) { if(e.body) Destroy(e.body); if(e.warning) Destroy(e.warning); } enemies.Clear();
         foreach(var s in shots) if(s.body) Destroy(s.body); shots.Clear();
@@ -667,6 +673,7 @@ public class DanielSimulator : MonoBehaviour
         var markerRenderer=shadow.GetComponent<Renderer>(); markerRenderer.GetPropertyBlock(markerColor); markerColor.SetColor("_BaseColor",stealth>0?new Color(.67f,.32f,.88f):new Color(.29f,.9f,.68f)); markerRenderer.SetPropertyBlock(markerColor);
         Vector3 pp=player.transform.position; pp.x=Mathf.Clamp(pp.x,-11.8f,11.8f); pp.z=Mathf.Clamp(pp.z,-8.8f,8.8f); player.transform.position=pp; shadow.transform.position=pp+Vector3.up*.035f;
         foreach(var e in enemies) UpdateEnemy(e,dt);
+        UpdateTruthBlades();
         foreach (var e in enemies)
         {
             if (e.dead) continue;
@@ -932,29 +939,60 @@ public class DanielSimulator : MonoBehaviour
     }
     void CastTacticalSkill()
     {
-        if (ultimateWindup > 0f || ultimateTime > 0f || tacticalCooldown > 0f) return;
+        if (ultimateWindup > 0f || ultimateTime > 0f || tacticalCooldown > 0f || truthBladesNextStrike >= 0) return;
 
         CancelUltimateExit();
         stealth = 0f;
-        int rank = tacticalLevel - 1;
-        tacticalCooldown = tacticalCooldownDuration = TacticalCooldown[rank];
-        tacticalHasteTime = TacticalHasteDuration;
+        // F-slot skills return their base cooldown after a successful cast.
+        tacticalCooldownDuration = CastTruthBlades();
+        tacticalCooldown = PracticeCooldown(tacticalCooldownDuration);
+    }
 
-        Vector3 origin = player.transform.position;
-        bool upgraded = tacticalLevel == 2;
-        float damage = TacticalDamage;
-        float moduleDamage = upgraded ? TacticalModuleDamage : 0f;
-        int targetsHit = 0;
-        DanielSkillVfx.TruthBlades(origin, player.transform.forward, TacticalRange, upgraded);
-        foreach (var enemy in enemies)
+    float CastTruthBlades()
+    {
+        truthBladesRank = tacticalLevel - 1;
+        truthBladesStartedAt = Time.time;
+        truthBladesNextStrike = 0;
+        truthBladesDamage = TacticalDamage;
+        truthBladesModuleDamage = TacticalModuleDamage;
+        truthBladesTargets.Clear();
+        DanielSkillVfx.TruthBlades(player.transform, TacticalRange, truthBladesRank == 1);
+        skillAudio.Play(truthBladesRank == 1 ? DanielSkillAudio.Cue.F_Level2_Intro : DanielSkillAudio.Cue.F_Level1_Intro);
+        return TacticalCooldown[truthBladesRank];
+    }
+
+    void UpdateTruthBlades()
+    {
+        if (truthBladesNextStrike < 0) return;
+
+        float age = Time.time - truthBladesStartedAt;
+        while (truthBladesNextStrike >= 0 && age >= TruthFirstStrike + truthBladesNextStrike * TruthSecondStrikeDelay)
         {
-            if (enemy.dead || (enemy.body.transform.position - origin).sqrMagnitude > TacticalRange * TacticalRange) continue;
-            Hurt(enemy, damage, extraSkillDamage: moduleDamage);
-            targetsHit++;
-        }
+            bool first = truthBladesNextStrike == 0;
+            bool upgraded = truthBladesRank == 1;
+            Vector3 origin = player.transform.position;
+            bool hit = false;
+            foreach (var enemy in enemies)
+            {
+                if (enemy.dead || (enemy.body.transform.position - origin).sqrMagnitude > TacticalRange * TacticalRange) continue;
+                DanielSkillVfx.TruthBladeImpact(enemy.body.transform.position, !first);
+                Hurt(enemy, first ? truthBladesDamage : truthBladesModuleDamage, canDetonateMark: false);
+                truthBladesTargets.Add(enemy);
+                hit = true;
+            }
 
-        tacticalHaste = Mathf.Min(TacticalMaxHaste[rank],
-            TacticalBaseHaste + Mathf.Max(0, targetsHit - 1) * TacticalHastePerTarget[rank]);
+            if (first)
+            {
+                var cue = upgraded
+                    ? (hit ? DanielSkillAudio.Cue.F_Level2_Hit : DanielSkillAudio.Cue.F_Level2_Miss)
+                    : (hit ? DanielSkillAudio.Cue.F_Level1_Hit : DanielSkillAudio.Cue.F_Level1_Miss);
+                skillAudio.Play(cue);
+                tacticalHasteTime = TacticalHasteDuration;
+            }
+            tacticalHaste = Mathf.Min(TacticalMaxHaste[truthBladesRank],
+                TacticalBaseHaste + Mathf.Max(0, truthBladesTargets.Count - 1) * TacticalHastePerTarget[truthBladesRank]);
+            truthBladesNextStrike = first && upgraded ? 1 : -1;
+        }
     }
 
     void CastDagger()
@@ -1424,7 +1462,7 @@ public class DanielSimulator : MonoBehaviour
             float shownTime = active > 0 ? active : remaining;
             if (!locked && showTimer && shownTime > 0)
             {
-                DrawCooldownSweep(rect, shownTime / Mathf.Max(.01f, active > 0 ? activeDuration : i == TacticalSlot ? cooldownDuration : PracticeCooldown(cooldownDuration)),
+                DrawCooldownSweep(rect, shownTime / Mathf.Max(.01f, active > 0 ? activeDuration : PracticeCooldown(cooldownDuration)),
                     active > 0 ? new Color(.02f, .25f, .34f, .60f) : new Color(.015f, .02f, .04f, .77f));
                 string time = shownTime >= 1 ? Mathf.CeilToInt(shownTime).ToString() : shownTime.ToString("0.0");
                 GUI.Label(new Rect(rect.x + 1, rect.y - 1, rect.width, rect.height), time, skillTimerShadow);
@@ -1568,6 +1606,7 @@ public class DanielSimulator : MonoBehaviour
                 {
                     for (int i = 0; i < cooldown.Length; i++) cooldown[i] = Mathf.Min(cooldown[i], PracticeCooldown(cooldown[i]));
                     daggerCooldown = Mathf.Min(daggerCooldown, PracticeCooldown(daggerCooldown));
+                    tacticalCooldown = Mathf.Min(tacticalCooldown, PracticeCooldown(tacticalCooldown));
                 }
             }
             passiveLevel = DrawPracticeValue("패시브 레벨", passiveLevel, 474, 1, 1, PassiveSight.Length);
