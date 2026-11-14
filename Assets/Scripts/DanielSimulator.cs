@@ -63,11 +63,11 @@ public class DanielSimulator : MonoBehaviour
     float shadowStrikeDamage, shadowCooldown, ultimateTickDamage, ultimateExitDamage, activeUltimateCooldown;
     float BonusAttackPower => 0f;
     // The stored-damage stat is a percentage: +0.08 percentage points per bonus attack power.
-    float MarkStoreRatio => WStore[wLevel - 1] + .0008f * BonusAttackPower;
-    float MarkSkillDamage => WDamage[wLevel - 1] + .6f * attackPower;
-    float ShadowStrikeDamage => EDamage[eLevel - 1] + .5f * BonusAttackPower;
-    float UltimateTickDamage => RTickDamage[rLevel - 1] + .3f * attackPower;
-    float UltimateExitDamage => RExitDamage[rLevel - 1] + .9f * attackPower;
+    float MarkStoreRatio => WStore[Mathf.Max(0, wLevel - 1)] + .0008f * BonusAttackPower;
+    float MarkSkillDamage => WDamage[Mathf.Max(0, wLevel - 1)] + .6f * attackPower;
+    float ShadowStrikeDamage => EDamage[Mathf.Max(0, eLevel - 1)] + .5f * BonusAttackPower;
+    float UltimateTickDamage => RTickDamage[Mathf.Max(0, rLevel - 1)] + .3f * attackPower;
+    float UltimateExitDamage => RExitDamage[Mathf.Max(0, rLevel - 1)] + .9f * attackPower;
     Enemy attackTarget, ultimateTarget;
     static readonly float[] DaggerDamage = { 10, 30, 50 };
     static readonly float[] DaggerHaste = { .30f, .35f, .40f };
@@ -79,6 +79,8 @@ public class DanielSimulator : MonoBehaviour
     int practiceTab;
     bool practiceNight;
     int passiveLevel = 1, danielLevel = 1;
+    int AllocatedSkillPoints => qLevel + wLevel + eLevel + rLevel + (passiveLevel - 1);
+    int AvailableSkillPoints => danielLevel - AllocatedSkillPoints;
     static readonly float[] PassiveSight = { .14f, .17f, .20f };
     static readonly float[] PassiveSpeed = { .02f, .04f, .06f };
     bool IsNight => mode == Mode.Free && practiceNight;
@@ -336,12 +338,18 @@ public class DanielSimulator : MonoBehaviour
         lastReceivedDamage = totalReceivedDamage = receivedStreakDamage = firstReceivedTime = lastReceivedTime = 0f;
         fireZones.Clear();
         SetTargetEdit(TargetEdit.None);
-        if (next != Mode.Free || mode != Mode.Free)
+        if (next != Mode.Free)
         {
+            danielLevel = 1;
+            passiveLevel = 1;
             qLevel = Mathf.Clamp(startingQLevel, 1, QDamage.Length);
             wLevel = Mathf.Clamp(startingWLevel, 1, WDamage.Length);
             eLevel = Mathf.Clamp(startingELevel, 1, EDamage.Length);
             rLevel = Mathf.Clamp(startingRLevel, 1, RTickDamage.Length);
+        }
+        else if (mode != Mode.Free)
+        {
+            ResetSkillProgression();
         }
         if(characterAnimation) characterAnimation.Footstep -= skillAudio.PlayFootstep;
         if(ultimateVfx) ultimateVfx.Stop(); ultimateVfx=null; characterAnimation=null; castFacingTime=0;
@@ -531,7 +539,7 @@ public class DanielSimulator : MonoBehaviour
     bool CanSeeEnemy(Enemy target)
     {
         Vector3 position = target.body.transform.position;
-        float sight = NormalSightRadius * (IsNight ? 1f + PassiveSight[passiveLevel - 1] : 1f);
+        float sight = NormalSightRadius * (IsNight && passiveLevel > 0 ? 1f + PassiveSight[passiveLevel - 1] : 1f);
         if ((position - player.transform.position).sqrMagnitude <= sight * sight)
             return true;
         foreach (var marked in enemies)
@@ -642,7 +650,21 @@ public class DanielSimulator : MonoBehaviour
                 if(nearest==null) foreach(var e in enemies) { if(e.dead || !CanSeeEnemy(e)) continue; float d=Vector3.Distance(e.body.transform.position,cursor); if(d<best) { best=d; nearest=e; } }
                 if(nearest!=null) { attackTarget=nearest; DanielSkillVfx.ClickMarker(nearest.body.transform.position,true); } else Show("A: 커서 근처에 공격할 적이 없습니다.");
             }
-            if(Keyboard.current.qKey.wasPressedThisFrame) Cast(0); if(Keyboard.current.wKey.wasPressedThisFrame) Cast(1); if(Keyboard.current.eKey.wasPressedThisFrame) Cast(2); if(Keyboard.current.rKey.wasPressedThisFrame) Cast(3);
+            if (mode == Mode.Free && Keyboard.current.ctrlKey.isPressed)
+            {
+                if (Keyboard.current.qKey.wasPressedThisFrame) LearnSkill(0);
+                if (Keyboard.current.wKey.wasPressedThisFrame) LearnSkill(1);
+                if (Keyboard.current.eKey.wasPressedThisFrame) LearnSkill(2);
+                if (Keyboard.current.rKey.wasPressedThisFrame) LearnSkill(3);
+                if (Keyboard.current.tKey.wasPressedThisFrame) LearnSkill(PassiveSlot);
+            }
+            else
+            {
+                if (Keyboard.current.qKey.wasPressedThisFrame) Cast(0);
+                if (Keyboard.current.wKey.wasPressedThisFrame) Cast(1);
+                if (Keyboard.current.eKey.wasPressedThisFrame) Cast(2);
+                if (Keyboard.current.rKey.wasPressedThisFrame) Cast(3);
+            }
             if(Keyboard.current.dKey.wasPressedThisFrame) CastDagger();
             if (Keyboard.current.fKey.wasPressedThisFrame) CastTacticalSkill();
             if (Keyboard.current.escapeKey.wasPressedThisFrame && targetEdit != TargetEdit.None) SetTargetEdit(TargetEdit.None);
@@ -657,7 +679,7 @@ public class DanielSimulator : MonoBehaviour
         if(rangeVfx) { bool inside=false; foreach(var e in enemies) if(!e.dead && CanSeeEnemy(e) && Vector3.Distance(e.body.transform.position,player.transform.position)<=ShadowRange) inside=true; rangeVfx.SetRangeHighlight(inside); }
         // R window: chevrons point at every target damaged in the last 4 s; dark out of range, bright inside it.
         foreach(var e in enemies) {
-            bool link=IsUltimateTarget(e) && CanSeeEnemy(e) && cooldown[3]<=0 && !IsUntargetable;
+            bool link=rLevel>0 && IsUltimateTarget(e) && CanSeeEnemy(e) && cooldown[3]<=0 && !IsUntargetable;
             if(link && !e.ultimateLink) e.ultimateLink=DanielSkillVfx.CreateUltimateLink(player.transform,e.body.transform);
             else if(!link && e.ultimateLink) { e.ultimateLink.Stop(); e.ultimateLink=null; }
             if(e.ultimateLink) e.ultimateLink.SetRangeHighlight(Vector3.Distance(e.body.transform.position,player.transform.position)<=UltimateRange);
@@ -1040,6 +1062,7 @@ public class DanielSimulator : MonoBehaviour
         if(ultimateWindup>0) return;
         if(ultimateTime>0) { if(index==3) { skillAudio.SkipToUltimateExit(); ExitUltimate(); } return; }
         if(index==3 && ultimateExitTime>0) return;
+        if (LearnedRank(index) == 0) return;
         if(index==1) { foreach(var e in enemies) if(e.mark>0) { Show("영감 표식이 사라진 뒤 다시 사용할 수 있습니다."); return; } }
         if(index==2 && (shadowBuff>0 || dashTime>0)) { Show("그림자 이동이 아직 지속 중입니다."); return; }
         if(cooldown[index]>0) { Show("아직 스킬을 사용할 수 없습니다."); return; }
@@ -1228,7 +1251,7 @@ public class DanielSimulator : MonoBehaviour
         float speed = 3.55f;
         if (daggerWindow > DaggerRecastDuration - DaggerHasteDuration) speed *= 1f + DaggerHaste[daggerRank];
         if (tacticalHasteTime > 0f) speed *= 1f + tacticalHaste;
-        if (IsNight) speed *= 1f + PassiveSpeed[passiveLevel - 1];
+        if (IsNight && passiveLevel > 0) speed *= 1f + PassiveSpeed[passiveLevel - 1];
         if (IsInFire(player.transform.position)) speed *= .7f;
         return speed;
     }
@@ -1427,6 +1450,12 @@ public class DanielSimulator : MonoBehaviour
     int DrawSkillBar()
     {
         int hovered = -1;
+        if (mode == Mode.Free && !ended && AvailableSkillPoints > 0)
+        {
+            var points = new Rect(279f, CombatHud.y - 21f, 130f, 21f);
+            Box(points, HudBackground);
+            GUI.Label(points, $"스킬 포인트 {AvailableSkillPoints}", skillKeyStyle);
+        }
         float markTime = 0;
         foreach (var enemy in enemies) markTime = Mathf.Max(markTime, enemy.mark);
         Vector2 cursor = Event.current.mousePosition;
@@ -1449,7 +1478,7 @@ public class DanielSimulator : MonoBehaviour
             var rect = new Rect(SkillSlotPosition(i), SkillSlotY, SkillSlotSize, SkillSlotSize);
             bool isHovered = rect.Contains(cursor);
             if (isHovered) hovered = i;
-            bool locked = (i == WeaponSlot && weaponMastery < 5 && active <= 0) || (i == PassiveSlot && !IsNight);
+            bool locked = (i <= PassiveSlot && LearnedRank(i) == 0) || (i == WeaponSlot && weaponMastery < 5 && active <= 0) || (i == PassiveSlot && !IsNight);
             Color edge = new Color(.27f, .33f, .39f);
             Box(new Rect(rect.x - 2, rect.y - 2, rect.width + 4, rect.height + 4), isHovered ? Color.white : edge);
             Box(rect, new Color(.045f, .06f, .09f));
@@ -1472,24 +1501,86 @@ public class DanielSimulator : MonoBehaviour
             Box(key, new Color(.02f, .03f, .05f, .92f));
             GUI.Label(key, SkillKeys[i], skillKeyStyle);
             DrawSkillRank(rect, i);
+            if (CanLearnSkill(i))
+            {
+                var upgrade = new Rect(rect.x, rect.y - 28f, rect.width, 22f);
+                if (upgrade.Contains(cursor)) hovered = i;
+                if (Button(upgrade, "+")) LearnSkill(i);
+            }
         }
         return hovered;
     }
 
-    void DrawSkillRank(Rect rect, int index)
+    int LearnedRank(int index) => index switch
     {
-        int rank, maximum;
+        0 => qLevel, 1 => wLevel, 2 => eLevel, 3 => rLevel, PassiveSlot => passiveLevel,
+        TacticalSlot => tacticalLevel, WeaponSlot => weaponMastery / 5, _ => 0
+    };
+
+    static int MaxLearnedRank(int index) => index switch
+    {
+        0 => QDamage.Length, 1 => WDamage.Length, 2 => EDamage.Length, 3 => RTickDamage.Length,
+        PassiveSlot => PassiveSight.Length, TacticalSlot => TacticalCooldown.Length, _ => DaggerDamage.Length
+    };
+
+    static int RequiredLevelForRank(int index, int rank) => index switch
+    {
+        3 => rank < 2 ? 6 : rank == 2 ? 11 : 18,
+        PassiveSlot => Mathf.Max(1, 1 + (rank - 1) * 4),
+        _ => Mathf.Max(1, 2 * rank - 1)
+    };
+
+    bool CanLearnSkill(int index)
+    {
+        if (mode != Mode.Free || ended || index < 0 || index > PassiveSlot || AvailableSkillPoints <= 0)
+            return false;
+
+        int rank = LearnedRank(index);
+        return rank < MaxLearnedRank(index) && danielLevel >= RequiredLevelForRank(index, rank + 1);
+    }
+
+    int MinimumDanielLevel()
+    {
+        int minimum = Mathf.Max(1, AllocatedSkillPoints);
+        for (int index = 0; index <= PassiveSlot; index++)
+        {
+            int rank = LearnedRank(index);
+            if (rank > 0) minimum = Mathf.Max(minimum, RequiredLevelForRank(index, rank));
+        }
+        return minimum;
+    }
+
+    void LearnSkill(int index)
+    {
+        if (!CanLearnSkill(index)) return;
         switch (index)
         {
-            case 0: rank = qLevel; maximum = QDamage.Length; break;
-            case 1: rank = wLevel; maximum = WDamage.Length; break;
-            case 2: rank = eLevel; maximum = EDamage.Length; break;
-            case 3: rank = rLevel; maximum = RTickDamage.Length; break;
-            case PassiveSlot: rank = passiveLevel; maximum = PassiveSight.Length; break;
-            case TacticalSlot: rank = tacticalLevel; maximum = TacticalCooldown.Length; break;
-            default: rank = weaponMastery / 5; maximum = DaggerDamage.Length; break;
+            case 0: qLevel++; break;
+            case 1: wLevel++; break;
+            case 2: eLevel++; break;
+            case 3: rLevel++; break;
+            case PassiveSlot: passiveLevel++; break;
         }
+    }
 
+    void ResetSkillProgression()
+    {
+        SetDanielLevel(1);
+        qLevel = wLevel = eLevel = rLevel = 0;
+        passiveLevel = 1;
+    }
+
+    void SetDanielLevel(int level)
+    {
+        float ratio = health / PlayerMaxHealth;
+        danielLevel = level;
+        health = Mathf.Clamp(ratio * PlayerMaxHealth, 1f, PlayerMaxHealth);
+    }
+
+    void DrawSkillRank(Rect rect, int index)
+    {
+        int rank = LearnedRank(index);
+        int maximum = MaxLearnedRank(index);
         float width = rect.width / maximum;
         for (int i = 0; i < maximum; i++)
             Box(new Rect(rect.x + i * width, rect.yMax + 4, width - 2f, 4f),
@@ -1516,7 +1607,7 @@ public class DanielSimulator : MonoBehaviour
         switch (index)
         {
             case 0:
-                details = $"가위로 범위를 베고, 중앙 적중 시 더 큰 피해와 둔화를 줍니다. 적중하면 다음 기본 공격 3회의 속도가 증가합니다.\n피해 {QDamage[qLevel - 1] + 1.1f * attackPower:0.#} · 공격력 110%\n중앙 {QCenterDamage[qLevel - 1] + 1.4f * attackPower:0.#} · 공격력 140%";
+                details = $"가위로 범위를 베고, 중앙 적중 시 더 큰 피해와 둔화를 줍니다. 적중하면 다음 기본 공격 3회의 속도가 증가합니다.\n피해 {QDamage[Mathf.Max(0, qLevel - 1)] + 1.1f * attackPower:0.#} · 공격력 110%\n중앙 {QCenterDamage[Mathf.Max(0, qLevel - 1)] + 1.4f * attackPower:0.#} · 공격력 140%";
                 ranks = $"레벨별 기본 피해 {FormatRanks(QDamage)}\n중앙 기본 피해 {FormatRanks(QCenterDamage)}";
                 break;
             case 1:
@@ -1532,7 +1623,7 @@ public class DanielSimulator : MonoBehaviour
                 ranks = $"레벨별 기본 틱 피해 {FormatRanks(RTickDamage)}\n기본 탈출 피해 {FormatRanks(RExitDamage)}";
                 break;
             case PassiveSlot:
-                int passive = passiveLevel - 1;
+                int passive = Mathf.Max(0, passiveLevel - 1);
                 details = $"밤에 시야와 이동 속도가 증가합니다.\n시야 +{PassiveSight[passive]:P0} · 이동 속도 +{PassiveSpeed[passive]:P0}";
                 ranks = "레벨별 시야 +14% / +17% / +20%\n이동 속도 +2% / +4% / +6%";
                 break;
@@ -1549,6 +1640,14 @@ public class DanielSimulator : MonoBehaviour
                 details = $"1초간 이동 속도가 증가합니다. 3초 안에 적에게 재사용하면 뒤로 이동해 피해와 둔화를 줍니다.\n피해 {damage:0.#} · 추가 공격력 50% + 스킬 증폭 25%\n고정 피해 · 대상 현재 체력 8%";
                 ranks = $"레벨별 기본 피해 {FormatRanks(DaggerDamage)}";
                 break;
+        }
+        if (index <= PassiveSlot && LearnedRank(index) == 0) details = "미습득 · 1레벨 미리보기\n" + details;
+        if (mode == Mode.Free && index <= PassiveSlot && LearnedRank(index) < MaxLearnedRank(index))
+        {
+            int neededLevel = RequiredLevelForRank(index, LearnedRank(index) + 1);
+            string shortcut = index == PassiveSlot ? "T" : SkillKeys[index];
+            details += CanLearnSkill(index) ? $"\nCtrl + {shortcut} · 스킬 포인트 1" :
+                danielLevel < neededLevel ? $"\n다음 스킬 랭크 · 다니엘 레벨 {neededLevel}" : "\n스킬 포인트 1 필요";
         }
         details += showRanks ? "\n\n" + ranks : "\n\nShift · 레벨별 수치";
 
@@ -1575,7 +1674,7 @@ public class DanielSimulator : MonoBehaviour
     }
 
     static readonly string[] PracticeTabs = { "다니엘", "일반 적", "보스" };
-    Rect PracticePanelRect => new Rect(960, 182, 290, practiceSettingsOpen ? (practiceTab == 1 ? 385 : practiceTab == 0 ? 383 : 320) : 38);
+    Rect PracticePanelRect => new Rect(960, 182, 290, practiceSettingsOpen ? (practiceTab == 1 ? 385 : practiceTab == 0 ? 287 : 320) : 38);
 
     void DrawPracticeSettings()
     {
@@ -1593,13 +1692,13 @@ public class DanielSimulator : MonoBehaviour
 
         if (practiceTab == 0)
         {
-            qLevel = DrawPracticeValue("Q 레벨", qLevel, 257, 1, 1, QDamage.Length);
-            wLevel = DrawPracticeValue("W 레벨", wLevel, 282, 1, 1, WDamage.Length);
-            eLevel = DrawPracticeValue("E 레벨", eLevel, 307, 1, 1, EDamage.Length);
-            rLevel = DrawPracticeValue("R 레벨", rLevel, 332, 1, 1, RTickDamage.Length);
-            weaponMastery = DrawPracticeValue("단검 숙련도", weaponMastery, 382, 1, 0, 15);
-            skillAmplification = DrawPracticeValue("스킬 증폭", skillAmplification, 407, 5, 0, float.MaxValue);
-            if (Button(new Rect(973, 440, 263, 28), fastPracticeCooldowns ? "쿨타임 초기화 켜짐 · 0.1초" : "쿨타임 초기화 꺼짐"))
+            int level = DrawPracticeValue("다니엘 레벨", danielLevel, 257, 1, MinimumDanielLevel(), 20);
+            if (level != danielLevel) SetDanielLevel(level);
+            if (Button(new Rect(973, 285, 263, 28), "레벨 및 스킬 초기화")) ResetSkillProgression();
+            tacticalLevel = DrawPracticeValue("전술스킬 레벨", tacticalLevel, 320, 1, 1, TacticalCooldown.Length);
+            weaponMastery = DrawPracticeValue("단검 숙련도", weaponMastery, 345, 1, 0, 15);
+            skillAmplification = DrawPracticeValue("스킬 증폭", skillAmplification, 370, 5, 0, float.MaxValue);
+            if (Button(new Rect(973, 430, 263, 28), fastPracticeCooldowns ? "쿨타임 초기화 켜짐 · 0.1초" : "쿨타임 초기화 꺼짐"))
             {
                 fastPracticeCooldowns = !fastPracticeCooldowns;
                 if (fastPracticeCooldowns)
@@ -1609,14 +1708,8 @@ public class DanielSimulator : MonoBehaviour
                     tacticalCooldown = Mathf.Min(tacticalCooldown, PracticeCooldown(tacticalCooldown));
                 }
             }
-            passiveLevel = DrawPracticeValue("패시브 레벨", passiveLevel, 474, 1, 1, PassiveSight.Length);
-            if (Button(new Rect(973, 504, 263, 28), IsNight ? "시간대  ·  밤" : "시간대  ·  낮"))
+            if (Button(new Rect(973, 398, 263, 28), IsNight ? "시간대  ·  밤" : "시간대  ·  낮"))
                 practiceNight = !practiceNight;
-            float previousMaxHealth = PlayerMaxHealth;
-            danielLevel = DrawPracticeValue("다니엘 레벨", danielLevel, 357, 1, 1, 20);
-            if (PlayerMaxHealth != previousMaxHealth)
-                health = Mathf.Clamp(health / previousMaxHealth * PlayerMaxHealth, 1f, PlayerMaxHealth);
-            tacticalLevel = DrawPracticeValue("전술스킬 레벨", tacticalLevel, 535, 1, 1, TacticalCooldown.Length);
             return;
         }
 
