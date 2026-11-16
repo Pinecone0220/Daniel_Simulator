@@ -60,6 +60,7 @@ public class DanielSimulator : MonoBehaviour
     float PlayerDefense => 51f + 2.8f * (danielLevel - 1);
     float PlayerHealthRegen => 1.53f + .077f * (danielLevel - 1);
     const float BaseAttackSpeedBonus = .07f;
+    const float BaseMoveSpeed = 3.55f;
     float shadowStrikeDamage, shadowCooldown, ultimateTickDamage, ultimateExitDamage, activeUltimateCooldown;
     float BonusAttackPower => 0f;
     // The stored-damage stat is a percentage: +0.08 percentage points per bonus attack power.
@@ -75,6 +76,11 @@ public class DanielSimulator : MonoBehaviour
     static readonly float[] DaggerCooldown = { 30, 25, 20 };
     const float DaggerRange = 3f, DaggerHasteDuration = 1f, DaggerRecastDuration = 3f;
     int weaponMastery = 5, daggerRank;
+    const int MaxDaggerMastery = 20, MasteryPerDaggerSkillRank = 5;
+    const float DaggerAttackSpeedPerLevel = .027f, DaggerBasicAttackAmpPerLevel = .02f;
+    float DaggerAttackSpeedBonus => weaponMastery * DaggerAttackSpeedPerLevel;
+    float DaggerBasicAttackAmp => weaponMastery * DaggerBasicAttackAmpPerLevel;
+    int DaggerSkillRank => Mathf.Min(weaponMastery / MasteryPerDaggerSkillRank, DaggerDamage.Length);
     readonly EnemySettings practiceTarget = new EnemySettings(1000), practiceBoss = new EnemySettings(1000);
     int practiceTab;
     bool practiceNight;
@@ -170,7 +176,8 @@ public class DanielSimulator : MonoBehaviour
     static readonly float[] RExitDamage = { 40, 105, 170 };
     static readonly float[] RCooldown = { 70, 60, 50 };
     static readonly float QFanSlope = Mathf.Tan(QHalfAngle * Mathf.Deg2Rad);
-    float AttackSpeedMultiplier => 1f + BaseAttackSpeedBonus + (qBuffAttacks > 0 ? qAttackSpeedBonus : 0f);
+    float AttackSpeedMultiplier => 1f + BaseAttackSpeedBonus + DaggerAttackSpeedBonus +
+        (qBuffAttacks > 0 ? qAttackSpeedBonus : 0f);
     const float UltimateWindupDuration = DanielSkillAudio.UltimateEnterOffset;
     const float UltimateHoldDuration = DanielSkillAudio.UltimateExitOffset - UltimateWindupDuration;
     const float FighterModelScale = .9f;
@@ -600,7 +607,8 @@ public class DanielSimulator : MonoBehaviour
         daggerCooldown = Mathf.Max(0, daggerCooldown - dt);
         tacticalCooldown = Mathf.Max(0f, tacticalCooldown - dt);
         tacticalHasteTime = Mathf.Max(0f, tacticalHasteTime - dt);
-        if(!IsUntargetable && Mouse.current!=null && Mouse.current.rightButton.wasPressedThisFrame) {
+        if(!IsUntargetable && Mouse.current!=null && Mouse.current.rightButton.wasPressedThisFrame &&
+            !IsOverPracticePanel(Mouse.current.position.ReadValue())) {
             Enemy clicked=EnemyAtCursor();
             if(clicked!=null) { attackTarget=clicked; DanielSkillVfx.ClickMarker(clicked.body.transform.position,true); Show("표적을 추격하고 기본 공격합니다."); }
             else { attackTarget=null; destination=MouseWorld(); destination.x=Mathf.Clamp(destination.x,-11.8f,11.8f); destination.z=Mathf.Clamp(destination.z,-8.8f,8.8f); destination.y=0; DanielSkillVfx.ClickMarker(destination,false); }
@@ -827,7 +835,7 @@ public class DanielSimulator : MonoBehaviour
         int defense = mode == Mode.Free ? (e.boss ? practiceBoss : practiceTarget).Defense : 0;
         float multiplier = 100f / (100f + defense);
         float skillDamage = (extraSkillDamage + (type == DamageType.Skill ? amount : 0f)) * multiplier;
-        float basicDamage = type == DamageType.Basic ? amount * multiplier : 0f;
+        float basicDamage = type == DamageType.Basic ? amount * (1f + DaggerBasicAttackAmp) * multiplier : 0f;
         float damage = basicDamage + skillDamage + trueDamage;
         float markBurstDamage = 0f;
         if (e.mark > WReadyTime)
@@ -1022,9 +1030,9 @@ public class DanielSimulator : MonoBehaviour
         if (ultimateWindup > 0 || ultimateTime > 0 || dashTime > 0) return;
         if (daggerWindow <= 0)
         {
-            if (weaponMastery < 5 || daggerCooldown > 0) return;
+            if (DaggerSkillRank == 0 || daggerCooldown > 0) return;
             CancelUltimateExit();
-            daggerRank = weaponMastery / 5 - 1;
+            daggerRank = DaggerSkillRank - 1;
             daggerWindow = DaggerRecastDuration;
             daggerCloakVfx = DanielSkillVfx.BeginDaggerCloak(player.transform, DaggerHasteDuration);
             daggerCooldown = PracticeCooldown(DaggerCooldown[daggerRank]);
@@ -1162,6 +1170,9 @@ public class DanielSimulator : MonoBehaviour
     void Box(Rect r,Color c) { GUI.color=c; GUI.DrawTexture(r,white); GUI.color=Color.white; }
     bool Button(Rect r,string text) { Box(r,new Color(.12f,.25f,.25f,.97f)); return GUI.Button(r,text,button); }
     void OnGUI() {
+        Event input = Event.current;
+        if ((input.type == EventType.MouseDown || input.type == EventType.MouseUp) && input.button != 0)
+            input.Use();
         InitStyles(); float sx=Screen.width/1280f, sy=Screen.height/720f; GUI.matrix=Matrix4x4.TRS(Vector3.zero,Quaternion.identity,new Vector3(sx,sy,1));
         Box(new Rect(0,0,1280,64),new Color(.025f,.04f,.05f,.96f)); GUI.Label(new Rect(28,12,500,35),"DANIEL  /  TRAINING GROUND",heading); GUI.Label(new Rect(930,23,320,25),"팬 메이드 전투 연습 프로토타입",small);
         if(mode==Mode.Menu) {
@@ -1248,7 +1259,7 @@ public class DanielSimulator : MonoBehaviour
 
     float CurrentMoveSpeed()
     {
-        float speed = 3.55f;
+        float speed = BaseMoveSpeed;
         if (daggerWindow > DaggerRecastDuration - DaggerHasteDuration) speed *= 1f + DaggerHaste[daggerRank];
         if (tacticalHasteTime > 0f) speed *= 1f + tacticalHaste;
         if (IsNight && passiveLevel > 0) speed *= 1f + PassiveSpeed[passiveLevel - 1];
@@ -1478,7 +1489,7 @@ public class DanielSimulator : MonoBehaviour
             var rect = new Rect(SkillSlotPosition(i), SkillSlotY, SkillSlotSize, SkillSlotSize);
             bool isHovered = rect.Contains(cursor);
             if (isHovered) hovered = i;
-            bool locked = (i <= PassiveSlot && LearnedRank(i) == 0) || (i == WeaponSlot && weaponMastery < 5 && active <= 0) || (i == PassiveSlot && !IsNight);
+            bool locked = (i <= PassiveSlot && LearnedRank(i) == 0) || (i == WeaponSlot && DaggerSkillRank == 0 && active <= 0) || (i == PassiveSlot && !IsNight);
             Color edge = new Color(.27f, .33f, .39f);
             Box(new Rect(rect.x - 2, rect.y - 2, rect.width + 4, rect.height + 4), isHovered ? Color.white : edge);
             Box(rect, new Color(.045f, .06f, .09f));
@@ -1514,7 +1525,7 @@ public class DanielSimulator : MonoBehaviour
     int LearnedRank(int index) => index switch
     {
         0 => qLevel, 1 => wLevel, 2 => eLevel, 3 => rLevel, PassiveSlot => passiveLevel,
-        TacticalSlot => tacticalLevel, WeaponSlot => weaponMastery / 5, _ => 0
+        TacticalSlot => tacticalLevel, WeaponSlot => DaggerSkillRank, _ => 0
     };
 
     static int MaxLearnedRank(int index) => index switch
@@ -1635,9 +1646,10 @@ public class DanielSimulator : MonoBehaviour
                 ranks = "기본 피해 140 · 모듈 기본 추가 피해 50";
                 break;
             default:
-                int rank = daggerWindow > 0 ? daggerRank : Mathf.Max(0, weaponMastery / 5 - 1);
+                int rank = daggerWindow > 0 ? daggerRank : Mathf.Max(0, DaggerSkillRank - 1);
                 float damage = DaggerDamage[rank] + .5f * BonusAttackPower + .25f * skillAmplification;
                 details = $"1초간 이동 속도가 증가합니다. 3초 안에 적에게 재사용하면 뒤로 이동해 피해와 둔화를 줍니다.\n피해 {damage:0.#} · 추가 공격력 50% + 스킬 증폭 25%\n고정 피해 · 대상 현재 체력 8%";
+                details += $"\n단검 숙련도 {weaponMastery} · 공속 +{DaggerAttackSpeedBonus * 100f:0.#}% · 기본 공격 증폭 +{DaggerBasicAttackAmp * 100f:0.#}%";
                 ranks = $"레벨별 기본 피해 {FormatRanks(DaggerDamage)}";
                 break;
         }
@@ -1676,6 +1688,14 @@ public class DanielSimulator : MonoBehaviour
     static readonly string[] PracticeTabs = { "다니엘", "일반 적", "보스" };
     Rect PracticePanelRect => new Rect(960, 182, 290, practiceSettingsOpen ? (practiceTab == 1 ? 385 : practiceTab == 0 ? 287 : 320) : 38);
 
+    bool IsOverPracticePanel(Vector2 screenPosition)
+    {
+        if (mode != Mode.Free || ended) return false;
+        var point = new Vector2(screenPosition.x * 1280f / Screen.width,
+            (Screen.height - screenPosition.y) * 720f / Screen.height);
+        return PracticePanelRect.Contains(point);
+    }
+
     void DrawPracticeSettings()
     {
         Box(PracticePanelRect, new Color(.025f, .045f, .055f, .91f));
@@ -1696,7 +1716,7 @@ public class DanielSimulator : MonoBehaviour
             if (level != danielLevel) SetDanielLevel(level);
             if (Button(new Rect(973, 285, 263, 28), "레벨 및 스킬 초기화")) ResetSkillProgression();
             tacticalLevel = DrawPracticeValue("전술스킬 레벨", tacticalLevel, 320, 1, 1, TacticalCooldown.Length);
-            weaponMastery = DrawPracticeValue("단검 숙련도", weaponMastery, 345, 1, 0, 15);
+            weaponMastery = DrawPracticeValue("단검 숙련도", weaponMastery, 345, 1, 0, MaxDaggerMastery);
             skillAmplification = DrawPracticeValue("스킬 증폭", skillAmplification, 370, 5, 0, float.MaxValue);
             if (Button(new Rect(973, 430, 263, 28), fastPracticeCooldowns ? "쿨타임 초기화 켜짐 · 0.1초" : "쿨타임 초기화 꺼짐"))
             {
