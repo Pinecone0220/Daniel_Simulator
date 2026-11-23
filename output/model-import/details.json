@@ -1,0 +1,2431 @@
+{
+  "weights": {
+    "mmd_edge_scale": 52059.0,
+    "mmd_vertex_order": 26029.000000218308,
+    "上半身3": 4526.9458524137735,
+    "腕.R": 1486.0355677008629,
+    "UppeerArmRuffle_RB_Spring_01": 274.0999493598938,
+    "首": 292.2933807000518,
+    "肩.L": 60.20486281439662,
+    "全ての親": 0.10000002384185791,
+    "腕.L": 1488.1555678248405,
+    "肩.R": 60.20486281439662,
+    "SpineRuffle_Spring_01": 95.49992525577545,
+    "頭": 8891.751190036535,
+    "足先EX.L": 906.8023211359978,
+    "足首D.L": 913.5476768016815,
+    "ひざD.L": 1236.150051832199,
+    "足先EX.R": 906.8023277521133,
+    "足首D.R": 913.5476430654526,
+    "ひざD.R": 1236.1500384807587,
+    "腕捩2.L": 920.5300007462502,
+    "腕捩1.L": 80.60999828577042,
+    "腕捩3.L": 1488.669999241829,
+    "腕捩.L": 316.470003426075,
+    "ひじ.L": 31.019998252391815,
+    "手捩1.L": 30.179999947547913,
+    "手捩2.L": 29.509999930858612,
+    "手捩3.L": 1178.4699991345406,
+    "手捩.L": 387.620001077652,
+    "腕捩2.R": 774.0000012516975,
+    "腕捩1.R": 80.53999829292297,
+    "腕捩3.R": 32.64000052213669,
+    "腕捩.R": 30.12000161409378,
+    "ひじ.R": 31.169998168945312,
+    "手捩1.R": 30.2600000500679,
+    "手捩2.R": 26.19000017642975,
+    "手捩3.R": 410.05999821424484,
+    "手捩.R": 1194.120001733303,
+    "中指１.L": 29.84999930858612,
+    "手首.L": 119.84074129164219,
+    "中指２.L": 21.950000822544098,
+    "中指３.L": 61.05000013113022,
+    "親指１.L": 35.800457052886486,
+    "親指０.L": 34.72077617794275,
+    "親指２.L": 68.70000004768372,
+    "人指１.L": 35.990000158548355,
+    "人指２.L": 22.099998950958252,
+    "人指３.L": 60.500000953674316,
+    "薬指１.L": 31.850006699562073,
+    "薬指２.L": 20.700000047683716,
+    "薬指３.L": 60.299999952316284,
+    "小指１.L": 30.048018634319305,
+    "小指２.L": 22.399999976158142,
+    "小指３.L": 60.199999928474426,
+    "中指１.R": 29.84999930858612,
+    "手首.R": 119.84074129164219,
+    "中指２.R": 21.950000822544098,
+    "中指３.R": 61.05000013113022,
+    "親指１.R": 35.800457052886486,
+    "親指０.R": 34.72077617794275,
+    "親指２.R": 68.70000004768372,
+    "人指１.R": 35.990000158548355,
+    "人指２.R": 22.099998950958252,
+    "人指３.R": 60.500000953674316,
+    "薬指１.R": 31.850006699562073,
+    "薬指２.R": 20.700000047683716,
+    "薬指３.R": 60.299999952316284,
+    "小指１.R": 30.048018634319305,
+    "小指２.R": 22.399999976158142,
+    "小指３.R": 60.199999928474426,
+    "スカート_5_0": 180.4581742286682,
+    "スカート_5_1": 152.44824266433716,
+    "スカート_6_0": 209.92576944828033,
+    "スカート_6_1": 84.697296500206,
+    "スカート_5_14": 152.4485411643982,
+    "スカート_6_14": 84.69699025154114,
+    "上半身2": 109.36008682847023,
+    "上半身": 147.41010904312134,
+    "下半身": 725.0822806172073,
+    "足D.L": 891.970006942749,
+    "足D.R": 367.79764825105667,
+    "スカート_4_4": 65.22111535072327,
+    "スカート_4_3": 87.19208270311356,
+    "スカート_5_4": 36.8573682308197,
+    "スカート_5_3": 60.26302373409271,
+    "スカート_3_3": 213.8081403374672,
+    "スカート_3_4": 163.01614212989807,
+    "スカート_2_3": 41.74000233411789,
+    "スカート_2_4": 30.835395216941833,
+    "スカート_1_3": 70.2908234000206,
+    "スカート_1_4": 58.43414783477783,
+    "スカート_1_2": 30.52507758140564,
+    "スカート_2_2": 53.222213089466095,
+    "スカート_6_3": 25.70169234275818,
+    "スカート_6_2": 57.638362646102905,
+    "スカート_5_2": 105.43053656816483,
+    "スカート_3_2": 118.104532122612,
+    "スカート_4_2": 157.29735606908798,
+    "スカート_2_1": 2.644722044467926,
+    "スカート_3_1": 50.11391258239746,
+    "スカート_4_1": 57.552642583847046,
+    "スカート_7_2": 22.285136818885803,
+    "スカート_7_1": 56.115008533000946,
+    "スカート_3_0": 47.04670536518097,
+    "スカート_4_0": 60.150651693344116,
+    "スカート_7_0": 41.19980746507645,
+    "スカート_8_0": 58.242610692977905,
+    "スカート_8_1": 30.122436106204987,
+    "スカート_9_1": 7.409657776355743,
+    "スカート_9_0": 3.1806987524032593,
+    "スカート_8_2": 6.7562872767448425,
+    "スカート_6_5": 58.56719446182251,
+    "スカート_6_4": 14.492755472660065,
+    "スカート_7_5": 22.301148414611816,
+    "スカート_5_5": 41.9667586684227,
+    "スカート_4_5": 168.74281418323517,
+    "スカート_1_5": 8.749951183795929,
+    "スカート_2_5": 49.98279929161072,
+    "スカート_3_5": 41.31608057022095,
+    "スカート_2_6": 16.418093621730804,
+    "スカート_3_6": 69.06855642795563,
+    "スカート_4_6": 87.46593451499939,
+    "スカート_5_6": 186.22601056098938,
+    "スカート_6_6": 56.604442954063416,
+    "スカート_7_6": 48.61369663476944,
+    "スカート_3_7": 58.04941648244858,
+    "スカート_2_7": 0.1567744016647339,
+    "スカート_4_7": 48.45283895730972,
+    "スカート_5_7": 168.5791755914688,
+    "スカート_6_7": 111.33555203676224,
+    "スカート_7_7": 66.9651347398758,
+    "スカート_7_8": 66.96517515182495,
+    "スカート_6_8": 111.33563405275345,
+    "スカート_5_8": 168.57920521497726,
+    "スカート_8_7": 35.287857353687286,
+    "スカート_8_8": 35.28786611557007,
+    "スカート_4_8": 48.45282709598541,
+    "スカート_3_8": 58.04944151639938,
+    "スカート_8_6": 20.401443660259247,
+    "スカート_8_5": 0.3106640577316284,
+    "スカート_7_4": 0.11995971202850342,
+    "スカート_4_12": 87.19157940149307,
+    "スカート_4_11": 65.22106444835663,
+    "スカート_5_11": 36.857376754283905,
+    "スカート_5_12": 60.26284897327423,
+    "スカート_3_12": 213.80749863386154,
+    "スカート_3_11": 163.01578277349472,
+    "スカート_2_12": 41.739975690841675,
+    "スカート_2_11": 30.83532565832138,
+    "スカート_1_12": 70.29056018590927,
+    "スカート_1_11": 58.43404561281204,
+    "スカート_1_13": 30.5254408121109,
+    "スカート_2_13": 53.222209215164185,
+    "スカート_6_12": 25.70154219865799,
+    "スカート_6_13": 57.63834661245346,
+    "スカート_5_13": 105.42997598648071,
+    "スカート_3_13": 118.10523009300232,
+    "スカート_4_13": 157.29755651950836,
+    "スカート_2_14": 2.6448274850845337,
+    "スカート_3_14": 50.11398720741272,
+    "スカート_4_14": 57.55284059047699,
+    "スカート_7_13": 22.284942030906677,
+    "スカート_7_14": 56.11510515213013,
+    "スカート_8_13": 6.7562408447265625,
+    "スカート_8_14": 30.122425079345703,
+    "スカート_9_14": 7.409643471240997,
+    "スカート_6_10": 58.567170202732086,
+    "スカート_6_11": 14.492847919464111,
+    "スカート_7_10": 22.30122607946396,
+    "スカート_5_10": 41.96668857336044,
+    "スカート_4_10": 168.7426751255989,
+    "スカート_1_10": 8.749953389167786,
+    "スカート_2_10": 49.98274475336075,
+    "スカート_3_10": 41.31607896089554,
+    "スカート_2_9": 16.41813862323761,
+    "スカート_3_9": 69.06849479675293,
+    "スカート_4_9": 87.46602076292038,
+    "スカート_5_9": 186.22607308626175,
+    "スカート_6_9": 56.60440289974213,
+    "スカート_7_9": 48.61369580030441,
+    "スカート_2_8": 0.15677857398986816,
+    "スカート_8_9": 20.40149348974228,
+    "スカート_8_10": 0.31067532300949097,
+    "スカート_7_11": 0.11996346712112427,
+    "ChestRibbon_L_Spring_01": 126.0,
+    "ChestRibbon_R_Spring_01": 126.0,
+    "NeckRibbon_B_Spring_02": 59.00000023841858,
+    "NeckRibbon_B_NonSpring_01": 67.99999976158142,
+    "NeckRibbon_R_NonSpring_01": 72.80000019073486,
+    "NeckRibbon_L_NonSpring_01": 72.80000019073486,
+    "ChestRibbon_LB_Spring_01": 55.0,
+    "ChestRibbon_RB_Spring_01": 55.0,
+    "UppeerArmRuffle_LB_Spring_01": 274.99994921684265,
+    "UppeerArmRuffle_LT_Spring_01": 279.19994831085205,
+    "UppeerArmRuffle_RT_Spring_01": 279.19994831085205,
+    "CalfRibbon_LBB2_Spring_02": 28.000000953674316,
+    "CalfRibbon_LBB2_NonSpring_01": 33.19999885559082,
+    "CalfRibbon_LBB1_Spring_02": 26.80000066757202,
+    "CalfRibbon_LBB1_NonSpring_01": 29.19999933242798,
+    "CalfRibbon_LT_Spring_01": 118.7999997138977,
+    "CalfRibbon_LB_Spring_01": 138.60000014305115,
+    "CalfRibbon_RBB2_Spring_02": 28.000000953674316,
+    "CalfRibbon_RBB2_NonSpring_01": 33.19999885559082,
+    "CalfRibbon_RBB1_Spring_02": 26.80000066757202,
+    "CalfRibbon_RBB1_NonSpring_01": 29.19999933242798,
+    "CalfRibbon_RT_Spring_01": 118.7999997138977,
+    "CalfRibbon_RB_Spring_01": 138.60000014305115,
+    "目戻.R": 41.0,
+    "目戻.L": 41.0,
+    "HairBun_L_NonSpring_01": 943.0,
+    "HairBun_R_NonSpring_01": 807.0,
+    "HairFlowerStamen_Spring_01": 137.6499999165535,
+    "NonSpring_Hair_F_01": 35.55000150203705,
+    "NonSpring_Hair_F_02": 37.200000405311584,
+    "Spring_Hair_F_03": 43.75000023841858,
+    "Spring_Hair_F_04": 38.799999713897705,
+    "Spring_Hair_F_05": 31.59999942779541,
+    "NonSpring_Hair_R_01": 44.1500004529953,
+    "Spring_Hair_R_02": 54.25000011920929,
+    "Spring_Hair_R_03": 66.65000021457672,
+    "Spring_Hair_R_04": 45.55000150203705,
+    "NonSpring_Hair_LB_01": 40.500001072883606,
+    "Spring_Hair_LB_02": 19.200000643730164,
+    "HairBunRibbon_LB_Spring_01": 84.89999997615814,
+    "HairBun_L_Root": 362.10000026226044,
+    "HairBunRibbon_RB_Spring_01": 84.89999997615814,
+    "HairBun_R_Root": 358.2000002861023,
+    "HairBunRibbon_LF_Spring_01": 45.99999976158142,
+    "HairBunRibbon_RF_Spring_01": 45.89999973773956,
+    "HairAccRibbon_B_NonSpring_01": 1340.048953294754,
+    "HairAccRibbon_T_NonSpring_01": 1236.9098480939865,
+    "HairFlower_Spring_01": 159.90000039339066,
+    "NonSpring_Wing_R_Down_01": 159.70000004768372,
+    "Spring_Wing_R_Down_02": 105.8999959230423,
+    "Spring_Wing_R_Down_03": 173.50000035762787,
+    "Spring_Wing_R_Down_04": 136.90000367164612,
+    "Spring_Wing_R_Up_03": 178.70000731945038,
+    "Spring_Wing_R_Up_02": 235.99999010562897,
+    "NonSpring_Wing_R_Up_01": 299.30000257492065,
+    "NonSpring_Wing_L_Down_01": 159.70000004768372,
+    "Spring_Wing_L_Down_02": 105.8999959230423,
+    "Spring_Wing_L_Down_03": 173.50000035762787,
+    "Spring_Wing_L_Down_04": 136.90000367164612,
+    "Spring_Wing_L_Up_03": 201.10000467300415,
+    "Spring_Wing_L_Up_02": 243.5999927520752,
+    "NonSpring_Wing_L_Up_01": 299.30000257492065
+  },
+  "mats": [
+    {
+      "name": "face",
+      "image": [
+        [
+          "mmd_base_tex",
+          "face.png"
+        ],
+        [
+          "mmd_toon_tex",
+          "toon05.bmp"
+        ]
+      ],
+      "inputs": [
+        [
+          "Ambient Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Diffuse Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Specular Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Reflect",
+          "1.0"
+        ],
+        [
+          "Base Tex Fac",
+          "1.0"
+        ],
+        [
+          "Base Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Toon Tex Fac",
+          "1.0"
+        ],
+        [
+          "Toon Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Tex Fac",
+          "1.0"
+        ],
+        [
+          "Sphere Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Mul/Add",
+          "1.0"
+        ],
+        [
+          "Double Sided",
+          "1.0"
+        ],
+        [
+          "Alpha",
+          "1.0"
+        ],
+        [
+          "Base Alpha",
+          "1.0"
+        ],
+        [
+          "Toon Alpha",
+          "1.0"
+        ],
+        [
+          "Sphere Alpha",
+          "1.0"
+        ]
+      ]
+    },
+    {
+      "name": "face_noline",
+      "image": [
+        [
+          "mmd_base_tex",
+          "face.png"
+        ],
+        [
+          "mmd_toon_tex",
+          "toon05.bmp"
+        ]
+      ],
+      "inputs": [
+        [
+          "Ambient Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Diffuse Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Specular Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Reflect",
+          "1.0"
+        ],
+        [
+          "Base Tex Fac",
+          "1.0"
+        ],
+        [
+          "Base Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Toon Tex Fac",
+          "1.0"
+        ],
+        [
+          "Toon Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Tex Fac",
+          "1.0"
+        ],
+        [
+          "Sphere Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Mul/Add",
+          "1.0"
+        ],
+        [
+          "Double Sided",
+          "1.0"
+        ],
+        [
+          "Alpha",
+          "1.0"
+        ],
+        [
+          "Base Alpha",
+          "1.0"
+        ],
+        [
+          "Toon Alpha",
+          "1.0"
+        ],
+        [
+          "Sphere Alpha",
+          "1.0"
+        ]
+      ]
+    },
+    {
+      "name": "eyebrow",
+      "image": [
+        [
+          "mmd_base_tex",
+          "face.png"
+        ],
+        [
+          "mmd_toon_tex",
+          "toon05.bmp"
+        ]
+      ],
+      "inputs": [
+        [
+          "Ambient Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Diffuse Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Specular Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Reflect",
+          "1.0"
+        ],
+        [
+          "Base Tex Fac",
+          "1.0"
+        ],
+        [
+          "Base Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Toon Tex Fac",
+          "1.0"
+        ],
+        [
+          "Toon Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Tex Fac",
+          "1.0"
+        ],
+        [
+          "Sphere Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Mul/Add",
+          "1.0"
+        ],
+        [
+          "Double Sided",
+          "1.0"
+        ],
+        [
+          "Alpha",
+          "1.0"
+        ],
+        [
+          "Base Alpha",
+          "1.0"
+        ],
+        [
+          "Toon Alpha",
+          "1.0"
+        ],
+        [
+          "Sphere Alpha",
+          "1.0"
+        ]
+      ]
+    },
+    {
+      "name": "eyelash",
+      "image": [
+        [
+          "mmd_base_tex",
+          "face.png"
+        ],
+        [
+          "mmd_toon_tex",
+          "toon05.bmp"
+        ]
+      ],
+      "inputs": [
+        [
+          "Ambient Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Diffuse Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Specular Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Reflect",
+          "1.0"
+        ],
+        [
+          "Base Tex Fac",
+          "1.0"
+        ],
+        [
+          "Base Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Toon Tex Fac",
+          "1.0"
+        ],
+        [
+          "Toon Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Tex Fac",
+          "1.0"
+        ],
+        [
+          "Sphere Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Mul/Add",
+          "1.0"
+        ],
+        [
+          "Double Sided",
+          "1.0"
+        ],
+        [
+          "Alpha",
+          "1.0"
+        ],
+        [
+          "Base Alpha",
+          "1.0"
+        ],
+        [
+          "Toon Alpha",
+          "1.0"
+        ],
+        [
+          "Sphere Alpha",
+          "1.0"
+        ]
+      ]
+    },
+    {
+      "name": "eyewhite",
+      "image": [
+        [
+          "mmd_base_tex",
+          "face.png"
+        ],
+        [
+          "mmd_toon_tex",
+          "toon05.bmp"
+        ]
+      ],
+      "inputs": [
+        [
+          "Ambient Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Diffuse Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Specular Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Reflect",
+          "1.0"
+        ],
+        [
+          "Base Tex Fac",
+          "1.0"
+        ],
+        [
+          "Base Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Toon Tex Fac",
+          "1.0"
+        ],
+        [
+          "Toon Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Tex Fac",
+          "1.0"
+        ],
+        [
+          "Sphere Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Mul/Add",
+          "1.0"
+        ],
+        [
+          "Double Sided",
+          "1.0"
+        ],
+        [
+          "Alpha",
+          "1.0"
+        ],
+        [
+          "Base Alpha",
+          "1.0"
+        ],
+        [
+          "Toon Alpha",
+          "1.0"
+        ],
+        [
+          "Sphere Alpha",
+          "1.0"
+        ]
+      ]
+    },
+    {
+      "name": "eye",
+      "image": [
+        [
+          "mmd_base_tex",
+          "eye.png"
+        ],
+        [
+          "mmd_toon_tex",
+          "toon05.bmp"
+        ]
+      ],
+      "inputs": [
+        [
+          "Ambient Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Diffuse Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Specular Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Reflect",
+          "1.0"
+        ],
+        [
+          "Base Tex Fac",
+          "1.0"
+        ],
+        [
+          "Base Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Toon Tex Fac",
+          "1.0"
+        ],
+        [
+          "Toon Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Tex Fac",
+          "1.0"
+        ],
+        [
+          "Sphere Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Mul/Add",
+          "1.0"
+        ],
+        [
+          "Double Sided",
+          "1.0"
+        ],
+        [
+          "Alpha",
+          "1.0"
+        ],
+        [
+          "Base Alpha",
+          "1.0"
+        ],
+        [
+          "Toon Alpha",
+          "1.0"
+        ],
+        [
+          "Sphere Alpha",
+          "1.0"
+        ]
+      ]
+    },
+    {
+      "name": "mouth",
+      "image": [
+        [
+          "mmd_base_tex",
+          "face.png"
+        ],
+        [
+          "mmd_toon_tex",
+          "toon05.bmp"
+        ]
+      ],
+      "inputs": [
+        [
+          "Ambient Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Diffuse Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Specular Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Reflect",
+          "1.0"
+        ],
+        [
+          "Base Tex Fac",
+          "1.0"
+        ],
+        [
+          "Base Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Toon Tex Fac",
+          "1.0"
+        ],
+        [
+          "Toon Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Tex Fac",
+          "1.0"
+        ],
+        [
+          "Sphere Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Mul/Add",
+          "1.0"
+        ],
+        [
+          "Double Sided",
+          "1.0"
+        ],
+        [
+          "Alpha",
+          "1.0"
+        ],
+        [
+          "Base Alpha",
+          "1.0"
+        ],
+        [
+          "Toon Alpha",
+          "1.0"
+        ],
+        [
+          "Sphere Alpha",
+          "1.0"
+        ]
+      ]
+    },
+    {
+      "name": "teeth",
+      "image": [
+        [
+          "mmd_base_tex",
+          "face.png"
+        ],
+        [
+          "mmd_toon_tex",
+          "toon05.bmp"
+        ]
+      ],
+      "inputs": [
+        [
+          "Ambient Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Diffuse Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Specular Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Reflect",
+          "1.0"
+        ],
+        [
+          "Base Tex Fac",
+          "1.0"
+        ],
+        [
+          "Base Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Toon Tex Fac",
+          "1.0"
+        ],
+        [
+          "Toon Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Tex Fac",
+          "1.0"
+        ],
+        [
+          "Sphere Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Mul/Add",
+          "1.0"
+        ],
+        [
+          "Double Sided",
+          "1.0"
+        ],
+        [
+          "Alpha",
+          "1.0"
+        ],
+        [
+          "Base Alpha",
+          "1.0"
+        ],
+        [
+          "Toon Alpha",
+          "1.0"
+        ],
+        [
+          "Sphere Alpha",
+          "1.0"
+        ]
+      ]
+    },
+    {
+      "name": "tongue",
+      "image": [
+        [
+          "mmd_base_tex",
+          "face.png"
+        ],
+        [
+          "mmd_toon_tex",
+          "toon05.bmp"
+        ]
+      ],
+      "inputs": [
+        [
+          "Ambient Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Diffuse Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Specular Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Reflect",
+          "1.0"
+        ],
+        [
+          "Base Tex Fac",
+          "1.0"
+        ],
+        [
+          "Base Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Toon Tex Fac",
+          "1.0"
+        ],
+        [
+          "Toon Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Tex Fac",
+          "1.0"
+        ],
+        [
+          "Sphere Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Mul/Add",
+          "1.0"
+        ],
+        [
+          "Double Sided",
+          "1.0"
+        ],
+        [
+          "Alpha",
+          "1.0"
+        ],
+        [
+          "Base Alpha",
+          "1.0"
+        ],
+        [
+          "Toon Alpha",
+          "1.0"
+        ],
+        [
+          "Sphere Alpha",
+          "1.0"
+        ]
+      ]
+    },
+    {
+      "name": "body",
+      "image": [
+        [
+          "mmd_base_tex",
+          "body.png"
+        ],
+        [
+          "mmd_toon_tex",
+          "toon05.bmp"
+        ]
+      ],
+      "inputs": [
+        [
+          "Ambient Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Diffuse Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Specular Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Reflect",
+          "1.0"
+        ],
+        [
+          "Base Tex Fac",
+          "1.0"
+        ],
+        [
+          "Base Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Toon Tex Fac",
+          "1.0"
+        ],
+        [
+          "Toon Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Tex Fac",
+          "1.0"
+        ],
+        [
+          "Sphere Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Mul/Add",
+          "1.0"
+        ],
+        [
+          "Double Sided",
+          "1.0"
+        ],
+        [
+          "Alpha",
+          "1.0"
+        ],
+        [
+          "Base Alpha",
+          "1.0"
+        ],
+        [
+          "Toon Alpha",
+          "1.0"
+        ],
+        [
+          "Sphere Alpha",
+          "1.0"
+        ]
+      ]
+    },
+    {
+      "name": "nail",
+      "image": [
+        [
+          "mmd_base_tex",
+          "body.png"
+        ],
+        [
+          "mmd_toon_tex",
+          "toon05.bmp"
+        ]
+      ],
+      "inputs": [
+        [
+          "Ambient Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Diffuse Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Specular Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Reflect",
+          "1.0"
+        ],
+        [
+          "Base Tex Fac",
+          "1.0"
+        ],
+        [
+          "Base Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Toon Tex Fac",
+          "1.0"
+        ],
+        [
+          "Toon Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Tex Fac",
+          "1.0"
+        ],
+        [
+          "Sphere Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Mul/Add",
+          "1.0"
+        ],
+        [
+          "Double Sided",
+          "1.0"
+        ],
+        [
+          "Alpha",
+          "1.0"
+        ],
+        [
+          "Base Alpha",
+          "1.0"
+        ],
+        [
+          "Toon Alpha",
+          "1.0"
+        ],
+        [
+          "Sphere Alpha",
+          "1.0"
+        ]
+      ]
+    },
+    {
+      "name": "hair",
+      "image": [
+        [
+          "mmd_base_tex",
+          "hair.png"
+        ],
+        [
+          "mmd_toon_tex",
+          "toon05.bmp"
+        ]
+      ],
+      "inputs": [
+        [
+          "Ambient Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Diffuse Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Specular Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Reflect",
+          "1.0"
+        ],
+        [
+          "Base Tex Fac",
+          "1.0"
+        ],
+        [
+          "Base Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Toon Tex Fac",
+          "1.0"
+        ],
+        [
+          "Toon Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Tex Fac",
+          "1.0"
+        ],
+        [
+          "Sphere Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Mul/Add",
+          "1.0"
+        ],
+        [
+          "Double Sided",
+          "1.0"
+        ],
+        [
+          "Alpha",
+          "1.0"
+        ],
+        [
+          "Base Alpha",
+          "1.0"
+        ],
+        [
+          "Toon Alpha",
+          "1.0"
+        ],
+        [
+          "Sphere Alpha",
+          "1.0"
+        ]
+      ]
+    },
+    {
+      "name": "hairribbon",
+      "image": [
+        [
+          "mmd_base_tex",
+          "hair.png"
+        ],
+        [
+          "mmd_toon_tex",
+          "toon05.bmp"
+        ]
+      ],
+      "inputs": [
+        [
+          "Ambient Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Diffuse Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Specular Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Reflect",
+          "1.0"
+        ],
+        [
+          "Base Tex Fac",
+          "1.0"
+        ],
+        [
+          "Base Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Toon Tex Fac",
+          "1.0"
+        ],
+        [
+          "Toon Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Tex Fac",
+          "1.0"
+        ],
+        [
+          "Sphere Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Mul/Add",
+          "1.0"
+        ],
+        [
+          "Double Sided",
+          "1.0"
+        ],
+        [
+          "Alpha",
+          "1.0"
+        ],
+        [
+          "Base Alpha",
+          "1.0"
+        ],
+        [
+          "Toon Alpha",
+          "1.0"
+        ],
+        [
+          "Sphere Alpha",
+          "1.0"
+        ]
+      ]
+    },
+    {
+      "name": "hairpin",
+      "image": [
+        [
+          "mmd_base_tex",
+          "hair.png"
+        ],
+        [
+          "mmd_toon_tex",
+          "toon05.bmp"
+        ]
+      ],
+      "inputs": [
+        [
+          "Ambient Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Diffuse Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Specular Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Reflect",
+          "1.0"
+        ],
+        [
+          "Base Tex Fac",
+          "1.0"
+        ],
+        [
+          "Base Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Toon Tex Fac",
+          "1.0"
+        ],
+        [
+          "Toon Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Tex Fac",
+          "1.0"
+        ],
+        [
+          "Sphere Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Mul/Add",
+          "1.0"
+        ],
+        [
+          "Double Sided",
+          "1.0"
+        ],
+        [
+          "Alpha",
+          "1.0"
+        ],
+        [
+          "Base Alpha",
+          "1.0"
+        ],
+        [
+          "Toon Alpha",
+          "1.0"
+        ],
+        [
+          "Sphere Alpha",
+          "1.0"
+        ]
+      ]
+    },
+    {
+      "name": "flower",
+      "image": [
+        [
+          "mmd_base_tex",
+          "hair.png"
+        ],
+        [
+          "mmd_toon_tex",
+          "toon05.bmp"
+        ]
+      ],
+      "inputs": [
+        [
+          "Ambient Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Diffuse Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Specular Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Reflect",
+          "1.0"
+        ],
+        [
+          "Base Tex Fac",
+          "1.0"
+        ],
+        [
+          "Base Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Toon Tex Fac",
+          "1.0"
+        ],
+        [
+          "Toon Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Tex Fac",
+          "1.0"
+        ],
+        [
+          "Sphere Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Mul/Add",
+          "1.0"
+        ],
+        [
+          "Double Sided",
+          "1.0"
+        ],
+        [
+          "Alpha",
+          "1.0"
+        ],
+        [
+          "Base Alpha",
+          "1.0"
+        ],
+        [
+          "Toon Alpha",
+          "1.0"
+        ],
+        [
+          "Sphere Alpha",
+          "1.0"
+        ]
+      ]
+    },
+    {
+      "name": "tops",
+      "image": [
+        [
+          "mmd_base_tex",
+          "body.png"
+        ],
+        [
+          "mmd_toon_tex",
+          "toon05.bmp"
+        ]
+      ],
+      "inputs": [
+        [
+          "Ambient Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Diffuse Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Specular Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Reflect",
+          "1.0"
+        ],
+        [
+          "Base Tex Fac",
+          "1.0"
+        ],
+        [
+          "Base Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Toon Tex Fac",
+          "1.0"
+        ],
+        [
+          "Toon Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Tex Fac",
+          "1.0"
+        ],
+        [
+          "Sphere Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Mul/Add",
+          "1.0"
+        ],
+        [
+          "Double Sided",
+          "1.0"
+        ],
+        [
+          "Alpha",
+          "1.0"
+        ],
+        [
+          "Base Alpha",
+          "1.0"
+        ],
+        [
+          "Toon Alpha",
+          "1.0"
+        ],
+        [
+          "Sphere Alpha",
+          "1.0"
+        ]
+      ]
+    },
+    {
+      "name": "bottoms",
+      "image": [
+        [
+          "mmd_base_tex",
+          "body.png"
+        ],
+        [
+          "mmd_toon_tex",
+          "toon05.bmp"
+        ]
+      ],
+      "inputs": [
+        [
+          "Ambient Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Diffuse Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Specular Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Reflect",
+          "1.0"
+        ],
+        [
+          "Base Tex Fac",
+          "1.0"
+        ],
+        [
+          "Base Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Toon Tex Fac",
+          "1.0"
+        ],
+        [
+          "Toon Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Tex Fac",
+          "1.0"
+        ],
+        [
+          "Sphere Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Mul/Add",
+          "1.0"
+        ],
+        [
+          "Double Sided",
+          "0.0"
+        ],
+        [
+          "Alpha",
+          "1.0"
+        ],
+        [
+          "Base Alpha",
+          "1.0"
+        ],
+        [
+          "Toon Alpha",
+          "1.0"
+        ],
+        [
+          "Sphere Alpha",
+          "1.0"
+        ]
+      ]
+    },
+    {
+      "name": "sandal",
+      "image": [
+        [
+          "mmd_base_tex",
+          "body.png"
+        ],
+        [
+          "mmd_toon_tex",
+          "toon05.bmp"
+        ]
+      ],
+      "inputs": [
+        [
+          "Ambient Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Diffuse Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Specular Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Reflect",
+          "1.0"
+        ],
+        [
+          "Base Tex Fac",
+          "1.0"
+        ],
+        [
+          "Base Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Toon Tex Fac",
+          "1.0"
+        ],
+        [
+          "Toon Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Tex Fac",
+          "1.0"
+        ],
+        [
+          "Sphere Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Mul/Add",
+          "1.0"
+        ],
+        [
+          "Double Sided",
+          "1.0"
+        ],
+        [
+          "Alpha",
+          "1.0"
+        ],
+        [
+          "Base Alpha",
+          "1.0"
+        ],
+        [
+          "Toon Alpha",
+          "1.0"
+        ],
+        [
+          "Sphere Alpha",
+          "1.0"
+        ]
+      ]
+    },
+    {
+      "name": "bangle",
+      "image": [
+        [
+          "mmd_base_tex",
+          "body.png"
+        ],
+        [
+          "mmd_toon_tex",
+          "toon05.bmp"
+        ]
+      ],
+      "inputs": [
+        [
+          "Ambient Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Diffuse Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Specular Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Reflect",
+          "1.0"
+        ],
+        [
+          "Base Tex Fac",
+          "1.0"
+        ],
+        [
+          "Base Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Toon Tex Fac",
+          "1.0"
+        ],
+        [
+          "Toon Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Tex Fac",
+          "1.0"
+        ],
+        [
+          "Sphere Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Mul/Add",
+          "1.0"
+        ],
+        [
+          "Double Sided",
+          "1.0"
+        ],
+        [
+          "Alpha",
+          "1.0"
+        ],
+        [
+          "Base Alpha",
+          "1.0"
+        ],
+        [
+          "Toon Alpha",
+          "1.0"
+        ],
+        [
+          "Sphere Alpha",
+          "1.0"
+        ]
+      ]
+    },
+    {
+      "name": "starfish",
+      "image": [
+        [
+          "mmd_base_tex",
+          "body.png"
+        ],
+        [
+          "mmd_toon_tex",
+          "toon05.bmp"
+        ]
+      ],
+      "inputs": [
+        [
+          "Ambient Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Diffuse Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Specular Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Reflect",
+          "1.0"
+        ],
+        [
+          "Base Tex Fac",
+          "1.0"
+        ],
+        [
+          "Base Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Toon Tex Fac",
+          "1.0"
+        ],
+        [
+          "Toon Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Tex Fac",
+          "1.0"
+        ],
+        [
+          "Sphere Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Mul/Add",
+          "1.0"
+        ],
+        [
+          "Double Sided",
+          "1.0"
+        ],
+        [
+          "Alpha",
+          "1.0"
+        ],
+        [
+          "Base Alpha",
+          "1.0"
+        ],
+        [
+          "Toon Alpha",
+          "1.0"
+        ],
+        [
+          "Sphere Alpha",
+          "1.0"
+        ]
+      ]
+    },
+    {
+      "name": "fairy",
+      "image": [
+        [
+          "mmd_base_tex",
+          "fairy.png"
+        ],
+        [
+          "mmd_toon_tex",
+          "toon05.bmp"
+        ]
+      ],
+      "inputs": [
+        [
+          "Ambient Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Diffuse Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Specular Color",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Reflect",
+          "1.0"
+        ],
+        [
+          "Base Tex Fac",
+          "1.0"
+        ],
+        [
+          "Base Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Toon Tex Fac",
+          "1.0"
+        ],
+        [
+          "Toon Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Tex Fac",
+          "1.0"
+        ],
+        [
+          "Sphere Tex",
+          "<bpy_float[4], NodeSocketColor.default_value>"
+        ],
+        [
+          "Sphere Mul/Add",
+          "1.0"
+        ],
+        [
+          "Double Sided",
+          "1.0"
+        ],
+        [
+          "Alpha",
+          "1.0"
+        ],
+        [
+          "Base Alpha",
+          "1.0"
+        ],
+        [
+          "Toon Alpha",
+          "1.0"
+        ],
+        [
+          "Sphere Alpha",
+          "1.0"
+        ]
+      ]
+    }
+  ],
+  "constraints": [
+    [
+      "目.L",
+      [
+        [
+          "TRANSFORM",
+          "mmd_additional_rotation"
+        ]
+      ]
+    ],
+    [
+      "目戻.L",
+      [
+        [
+          "TRANSFORM",
+          "mmd_additional_rotation"
+        ]
+      ]
+    ],
+    [
+      "目.R",
+      [
+        [
+          "TRANSFORM",
+          "mmd_additional_rotation"
+        ]
+      ]
+    ],
+    [
+      "目戻.R",
+      [
+        [
+          "TRANSFORM",
+          "mmd_additional_rotation"
+        ]
+      ]
+    ],
+    [
+      "_shadow_目戻.L",
+      [
+        [
+          "COPY_TRANSFORMS",
+          "mmd_tools_at_dummy"
+        ]
+      ]
+    ],
+    [
+      "_shadow_目戻.R",
+      [
+        [
+          "COPY_TRANSFORMS",
+          "mmd_tools_at_dummy"
+        ]
+      ]
+    ],
+    [
+      "肩C.R",
+      [
+        [
+          "TRANSFORM",
+          "mmd_additional_rotation"
+        ]
+      ]
+    ],
+    [
+      "手捩1.R",
+      [
+        [
+          "TRANSFORM",
+          "mmd_additional_rotation"
+        ]
+      ]
+    ],
+    [
+      "手捩2.R",
+      [
+        [
+          "TRANSFORM",
+          "mmd_additional_rotation"
+        ]
+      ]
+    ],
+    [
+      "手捩3.R",
+      [
+        [
+          "TRANSFORM",
+          "mmd_additional_rotation"
+        ]
+      ]
+    ],
+    [
+      "_shadow_手捩1.R",
+      [
+        [
+          "COPY_TRANSFORMS",
+          "mmd_tools_at_dummy"
+        ]
+      ]
+    ],
+    [
+      "_shadow_手捩2.R",
+      [
+        [
+          "COPY_TRANSFORMS",
+          "mmd_tools_at_dummy"
+        ]
+      ]
+    ],
+    [
+      "_shadow_手捩3.R",
+      [
+        [
+          "COPY_TRANSFORMS",
+          "mmd_tools_at_dummy"
+        ]
+      ]
+    ],
+    [
+      "腕捩1.R",
+      [
+        [
+          "TRANSFORM",
+          "mmd_additional_rotation"
+        ]
+      ]
+    ],
+    [
+      "腕捩2.R",
+      [
+        [
+          "TRANSFORM",
+          "mmd_additional_rotation"
+        ]
+      ]
+    ],
+    [
+      "腕捩3.R",
+      [
+        [
+          "TRANSFORM",
+          "mmd_additional_rotation"
+        ]
+      ]
+    ],
+    [
+      "_shadow_腕捩1.R",
+      [
+        [
+          "COPY_TRANSFORMS",
+          "mmd_tools_at_dummy"
+        ]
+      ]
+    ],
+    [
+      "_shadow_腕捩2.R",
+      [
+        [
+          "COPY_TRANSFORMS",
+          "mmd_tools_at_dummy"
+        ]
+      ]
+    ],
+    [
+      "_shadow_腕捩3.R",
+      [
+        [
+          "COPY_TRANSFORMS",
+          "mmd_tools_at_dummy"
+        ]
+      ]
+    ],
+    [
+      "肩C.L",
+      [
+        [
+          "TRANSFORM",
+          "mmd_additional_rotation"
+        ]
+      ]
+    ],
+    [
+      "手捩1.L",
+      [
+        [
+          "TRANSFORM",
+          "mmd_additional_rotation"
+        ]
+      ]
+    ],
+    [
+      "手捩2.L",
+      [
+        [
+          "TRANSFORM",
+          "mmd_additional_rotation"
+        ]
+      ]
+    ],
+    [
+      "手捩3.L",
+      [
+        [
+          "TRANSFORM",
+          "mmd_additional_rotation"
+        ]
+      ]
+    ],
+    [
+      "_shadow_手捩1.L",
+      [
+        [
+          "COPY_TRANSFORMS",
+          "mmd_tools_at_dummy"
+        ]
+      ]
+    ],
+    [
+      "_shadow_手捩2.L",
+      [
+        [
+          "COPY_TRANSFORMS",
+          "mmd_tools_at_dummy"
+        ]
+      ]
+    ],
+    [
+      "_shadow_手捩3.L",
+      [
+        [
+          "COPY_TRANSFORMS",
+          "mmd_tools_at_dummy"
+        ]
+      ]
+    ],
+    [
+      "腕捩1.L",
+      [
+        [
+          "TRANSFORM",
+          "mmd_additional_rotation"
+        ]
+      ]
+    ],
+    [
+      "腕捩2.L",
+      [
+        [
+          "TRANSFORM",
+          "mmd_additional_rotation"
+        ]
+      ]
+    ],
+    [
+      "腕捩3.L",
+      [
+        [
+          "TRANSFORM",
+          "mmd_additional_rotation"
+        ]
+      ]
+    ],
+    [
+      "_shadow_腕捩1.L",
+      [
+        [
+          "COPY_TRANSFORMS",
+          "mmd_tools_at_dummy"
+        ]
+      ]
+    ],
+    [
+      "_shadow_腕捩2.L",
+      [
+        [
+          "COPY_TRANSFORMS",
+          "mmd_tools_at_dummy"
+        ]
+      ]
+    ],
+    [
+      "_shadow_腕捩3.L",
+      [
+        [
+          "COPY_TRANSFORMS",
+          "mmd_tools_at_dummy"
+        ]
+      ]
+    ],
+    [
+      "_shadow_肩C.R",
+      [
+        [
+          "COPY_TRANSFORMS",
+          "mmd_tools_at_dummy"
+        ]
+      ]
+    ],
+    [
+      "_shadow_肩C.L",
+      [
+        [
+          "COPY_TRANSFORMS",
+          "mmd_tools_at_dummy"
+        ]
+      ]
+    ],
+    [
+      "腰キャンセル.R",
+      [
+        [
+          "TRANSFORM",
+          "mmd_additional_rotation"
+        ]
+      ]
+    ],
+    [
+      "ひざ.R",
+      [
+        [
+          "IK",
+          "IK"
+        ],
+        [
+          "LIMIT_ROTATION",
+          "mmd_ik_limit_override"
+        ]
+      ]
+    ],
+    [
+      "足首.R",
+      [
+        [
+          "DAMPED_TRACK",
+          "mmd_ik_target_override"
+        ],
+        [
+          "IK",
+          "IK"
+        ]
+      ]
+    ],
+    [
+      "つま先.R",
+      [
+        [
+          "DAMPED_TRACK",
+          "mmd_ik_target_override"
+        ]
+      ]
+    ],
+    [
+      "_shadow_足首D.R",
+      [
+        [
+          "COPY_TRANSFORMS",
+          "mmd_tools_at_dummy"
+        ]
+      ]
+    ],
+    [
+      "_shadow_ひざD.R",
+      [
+        [
+          "COPY_TRANSFORMS",
+          "mmd_tools_at_dummy"
+        ]
+      ]
+    ],
+    [
+      "足D.R",
+      [
+        [
+          "TRANSFORM",
+          "mmd_additional_rotation"
+        ]
+      ]
+    ],
+    [
+      "ひざD.R",
+      [
+        [
+          "TRANSFORM",
+          "mmd_additional_rotation"
+        ]
+      ]
+    ],
+    [
+      "足首D.R",
+      [
+        [
+          "TRANSFORM",
+          "mmd_additional_rotation"
+        ]
+      ]
+    ],
+    [
+      "_shadow_足D.R",
+      [
+        [
+          "COPY_TRANSFORMS",
+          "mmd_tools_at_dummy"
+        ]
+      ]
+    ],
+    [
+      "腰キャンセル.L",
+      [
+        [
+          "TRANSFORM",
+          "mmd_additional_rotation"
+        ]
+      ]
+    ],
+    [
+      "ひざ.L",
+      [
+        [
+          "IK",
+          "IK"
+        ],
+        [
+          "LIMIT_ROTATION",
+          "mmd_ik_limit_override"
+        ]
+      ]
+    ],
+    [
+      "足首.L",
+      [
+        [
+          "DAMPED_TRACK",
+          "mmd_ik_target_override"
+        ],
+        [
+          "IK",
+          "IK"
+        ]
+      ]
+    ],
+    [
+      "つま先.L",
+      [
+        [
+          "DAMPED_TRACK",
+          "mmd_ik_target_override"
+        ]
+      ]
+    ],
+    [
+      "_shadow_足首D.L",
+      [
+        [
+          "COPY_TRANSFORMS",
+          "mmd_tools_at_dummy"
+        ]
+      ]
+    ],
+    [
+      "_shadow_ひざD.L",
+      [
+        [
+          "COPY_TRANSFORMS",
+          "mmd_tools_at_dummy"
+        ]
+      ]
+    ],
+    [
+      "足D.L",
+      [
+        [
+          "TRANSFORM",
+          "mmd_additional_rotation"
+        ]
+      ]
+    ],
+    [
+      "ひざD.L",
+      [
+        [
+          "TRANSFORM",
+          "mmd_additional_rotation"
+        ]
+      ]
+    ],
+    [
+      "足首D.L",
+      [
+        [
+          "TRANSFORM",
+          "mmd_additional_rotation"
+        ]
+      ]
+    ],
+    [
+      "_shadow_足D.L",
+      [
+        [
+          "COPY_TRANSFORMS",
+          "mmd_tools_at_dummy"
+        ]
+      ]
+    ],
+    [
+      "_shadow_腰キャンセル.R",
+      [
+        [
+          "COPY_TRANSFORMS",
+          "mmd_tools_at_dummy"
+        ]
+      ]
+    ],
+    [
+      "_shadow_腰キャンセル.L",
+      [
+        [
+          "COPY_TRANSFORMS",
+          "mmd_tools_at_dummy"
+        ]
+      ]
+    ]
+  ]
+}

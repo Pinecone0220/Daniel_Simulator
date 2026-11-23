@@ -151,7 +151,7 @@ public class DanielSimulator : MonoBehaviour
     int hits, dodged, kills, stealthUses;
     bool ended, won;
     Font font;
-    GUIStyle label, small, heading, button, centered;
+    GUIStyle label, small, heading, button, centered, compactPracticeLabel;
     Texture2D white, vignette;
     float stealthTint, ultimateExitTime;
     Vector3 ultimateExitFrom, ultimateExitTo;
@@ -372,9 +372,16 @@ public class DanielSimulator : MonoBehaviour
         if(player) Destroy(player); if(shadow) Destroy(shadow);
         destination = next==Mode.Menu ? new Vector3(4,0,0) : new Vector3(-5,0,-3); if(next!=Mode.Menu) camFocus=destination;
         player = new GameObject("Daniel 3D"); player.transform.position = destination;
-        GameObject modelAsset=Resources.Load<GameObject>("Characters/Y Bot");
+        GameObject modelAsset = Resources.Load<GameObject>("Characters/DaVanya/DaVanya");
+        bool daVanya = modelAsset != null;
+        bool tailored = false;
+        if (!daVanya) {
+            modelAsset = Resources.Load<GameObject>("Characters/Daniel_ShadowTailor");
+            tailored = modelAsset != null;
+        }
+        if(!modelAsset) modelAsset=Resources.Load<GameObject>("Characters/Y Bot");
         if(modelAsset!=null) {
-            GameObject model=Instantiate(modelAsset,player.transform); model.name="Y Bot (Daniel)";
+            GameObject model=Instantiate(modelAsset,player.transform); model.name=daVanya ? "DaVanya" : "Y Bot (Daniel)";
             model.transform.localPosition=Vector3.zero; model.transform.localRotation=Quaternion.identity; model.transform.localScale=Vector3.one;
             var renderers=model.GetComponentsInChildren<Renderer>();
             foreach(var renderer in renderers) {
@@ -384,6 +391,24 @@ public class DanielSimulator : MonoBehaviour
                     var material=new Material(Shader.Find("Universal Render Pipeline/Lit"));
                     if(source[i].HasProperty("_Color")) material.color=source[i].color;
                     if(source[i].HasProperty("_MainTex")) material.mainTexture=source[i].mainTexture;
+                    if (daVanya) {
+                        string textureName = source[i].name.Split(' ')[0].ToLowerInvariant();
+                        string texture = textureName == "eye" ? "eye" :
+                            textureName.StartsWith("face") || textureName == "eyebrow" || textureName == "eyelash" ||
+                            textureName == "eyewhite" || textureName == "mouth" || textureName == "teeth" || textureName == "tongue" ? "face" :
+                            textureName.StartsWith("hair") || textureName == "flower" ? "hair" :
+                            textureName == "fairy" ? "fairy" : "body";
+                        material.mainTexture = Resources.Load<Texture2D>("Characters/DaVanya/Textures/" + texture);
+                        material.color = Color.white;
+                        material.SetFloat("_Cull", 0);
+                        material.SetFloat("_AlphaClip", 1);
+                        material.SetFloat("_Cutoff", .35f);
+                        material.EnableKeyword("_ALPHATEST_ON");
+                        material.SetOverrideTag("RenderType", "TransparentCutout");
+                        material.renderQueue = 2450;
+                        material.SetFloat("_Smoothness", .22f);
+                    }
+                    material.name=source[i].name; if(tailored) DanielOutfit.Paint(material);
                     converted[i]=material;
                 }
                 renderer.materials=converted;
@@ -396,6 +421,7 @@ public class DanielSimulator : MonoBehaviour
                     model.transform.localPosition=new Vector3(-relativeCenter.x*scale,-(bounds.min.y-player.transform.position.y)*scale,-relativeCenter.z*scale);
                 }
             }
+            if(!tailored && !daVanya) DanielOutfit.Apply(model.transform);
             characterAnimation=model.AddComponent<DanielCharacterAnimation>();
             characterAnimation.Footstep += skillAudio.PlayFootstep;
             leftLeg=rightLeg=leftArm=rightArm=null;
@@ -1157,6 +1183,7 @@ public class DanielSimulator : MonoBehaviour
         if(label!=null) return;
         label=new GUIStyle(GUI.skin.label){font=font,fontSize=16,normal={textColor=ink},wordWrap=true};
         small=new GUIStyle(label){fontSize=13,normal={textColor=muted}};
+        compactPracticeLabel = new GUIStyle(label) { fontSize = 13, wordWrap = false };
         heading=new GUIStyle(label){fontSize=29,fontStyle=FontStyle.Bold,normal={textColor=Color.white}};
         centered=new GUIStyle(label){alignment=TextAnchor.MiddleCenter};
         dummyStatsStyle = new GUIStyle(centered) { fontSize = 13, normal = { textColor = Color.white } };
@@ -1769,7 +1796,7 @@ public class DanielSimulator : MonoBehaviour
         if (placeAdriana)
         {
             adrianaLevel = DrawPracticeValue("아드리아나 E 레벨", adrianaLevel, 429, 1, 1, AdrianaDamage.Length);
-            adrianaAmp = DrawPracticeValue("아드리아나 스킬 증폭", adrianaAmp, 454, 5, 0, 10000f);
+            adrianaAmp = DrawPracticeValue("아드리아나 스킬 증폭", adrianaAmp, 454, 5, 0, 10000f, compact: true);
         }
         DrawTargetEditButton(483, place, "선택한 더미 배치");
         DrawTargetEditButton(515, TargetEdit.Remove, "적 삭제");
@@ -1872,9 +1899,9 @@ public class DanielSimulator : MonoBehaviour
     int DrawPracticeValue(string name, int value, float y, int step, int min, int max)
         => (int)DrawPracticeValue(name, (float)value, y, step, min, max);
 
-    float DrawPracticeValue(string name, float value, float y, float step, float min, float max)
+    float DrawPracticeValue(string name, float value, float y, float step, float min, float max, bool compact = false)
     {
-        GUI.Label(new Rect(973, y, 170, 26), $"{name} {value:0.#}", label);
+        GUI.Label(new Rect(973, y, compact ? 186 : 170, 26), $"{name} {value:0.#}", compact ? compactPracticeLabel : label);
         if (Button(new Rect(1165, y, 32, 25), "−")) value = Mathf.Max(min, value - step);
         if (Button(new Rect(1204, y, 32, 25), "+")) value = Mathf.Min(max, value + step);
         return value;
