@@ -71,6 +71,7 @@ public sealed class DanielCharacterAnimation : MonoBehaviour
                 ghost.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha); ghost.SetFloat("_ZWrite", 0);
                 ghost.EnableKeyword("_SURFACE_TYPE_TRANSPARENT"); ghost.renderQueue = (int)RenderQueue.Transparent;
                 ghost.SetOverrideTag("RenderType", "Transparent");
+                if (ghost.IsKeywordEnabled("_ALPHATEST_ON")) ghost.SetFloat("_Cutoff", .05f);
                 ghost.SetColor("_BaseColor", new Color(.35f, .19f, .65f, .26f));
                 ghostMaterials[r][i] = ghost; ownedMaterials.Add(ghost);
             }

@@ -38,7 +38,7 @@ public class DanielSimulator : MonoBehaviour
     Mode mode = Mode.Menu;
     readonly List<Enemy> enemies = new List<Enemy>();
     readonly List<Shot> shots = new List<Shot>();
-    GameObject arena, player, shadow;
+    GameObject arena, player;
     DanielCharacterAnimation characterAnimation;
     DanielSkillVfx ultimateVfx, rangeVfx, veilVfx;
     bool quietReveal;
@@ -183,7 +183,6 @@ public class DanielSimulator : MonoBehaviour
     const float FighterModelScale = .9f;
     // Impact offsets from the start of R_Full.wav.
     static readonly float[] UltimateTickTimes = { .76f, 1.14f, 1.52f, 1.90f };
-    MaterialPropertyBlock markerColor;
     Material outlineMaterial;
     Color ink = new Color(.82f,.87f,.91f), muted = new Color(.55f,.63f,.68f), mint = new Color(.45f,.9f,.76f), red = new Color(1f,.38f,.38f);
 
@@ -203,7 +202,7 @@ public class DanielSimulator : MonoBehaviour
         danielPortrait = Resources.Load<Texture2D>("DanielPortrait");
         hudStats = Resources.Load<Texture2D>("HudStats");
         cooldownSweep = CreateCooldownSweep();
-        white = Texture2D.whiteTexture; markerColor=new MaterialPropertyBlock();
+        white = Texture2D.whiteTexture;
         // Soft-edged frame used to tint the screen while stealthed.
         vignette=new Texture2D(128,128,TextureFormat.RGBA32,false); vignette.wrapMode=TextureWrapMode.Clamp;
         for(int y=0;y<128;y++) for(int x=0;x<128;x++) {
@@ -369,7 +368,7 @@ public class DanielSimulator : MonoBehaviour
         for(int i=0;i<4;i++) cooldown[i]=0;
         foreach(var e in enemies) { if(e.body) Destroy(e.body); if(e.warning) Destroy(e.warning); } enemies.Clear();
         foreach(var s in shots) if(s.body) Destroy(s.body); shots.Clear();
-        if(player) Destroy(player); if(shadow) Destroy(shadow);
+        if(player) Destroy(player);
         destination = next==Mode.Menu ? new Vector3(4,0,0) : new Vector3(-5,0,-3); if(next!=Mode.Menu) camFocus=destination;
         player = new GameObject("Daniel 3D"); player.transform.position = destination;
         GameObject modelAsset = Resources.Load<GameObject>("Characters/DaVanya/DaVanya");
@@ -426,7 +425,6 @@ public class DanielSimulator : MonoBehaviour
             characterAnimation.Footstep += skillAudio.PlayFootstep;
             leftLeg=rightLeg=leftArm=rightArm=null;
         } else { Debug.LogError("Y Bot FBX could not be loaded from Resources/Characters/Y Bot."); BuildDaniel(player.transform); foreach (Transform part in player.transform) { part.localPosition *= FighterModelScale; part.localScale *= FighterModelScale; } }
-        shadow=Shape(PrimitiveType.Cylinder,"Player marker",destination+Vector3.up*.035f,new Vector3(.78f,.025f,.78f),new Color(.29f,.9f,.68f),arena.transform);
         if(next!=Mode.Menu) { AddEnemy(new Vector3(4,0,2),0); if(next==Mode.Puzzle3) AddEnemy(new Vector3(7,0,-3),1.1f); }
     }
     void AddEnemy(Vector3 position, float offset, bool boss = false, bool adriana = false) {
@@ -726,8 +724,7 @@ public class DanielSimulator : MonoBehaviour
         float swing=delta.magnitude>.1f?Mathf.Sin(Time.time*11)*25:0;
         if(leftLeg) leftLeg.localRotation=Quaternion.Euler(swing,0,0); if(rightLeg) rightLeg.localRotation=Quaternion.Euler(-swing,0,0);
         if(leftArm) leftArm.localRotation=Quaternion.Euler(-swing*.7f,0,-10); if(rightArm) rightArm.localRotation=Quaternion.Euler(swing*.7f,0,10);
-        var markerRenderer=shadow.GetComponent<Renderer>(); markerRenderer.GetPropertyBlock(markerColor); markerColor.SetColor("_BaseColor",stealth>0?new Color(.67f,.32f,.88f):new Color(.29f,.9f,.68f)); markerRenderer.SetPropertyBlock(markerColor);
-        Vector3 pp=player.transform.position; pp.x=Mathf.Clamp(pp.x,-11.8f,11.8f); pp.z=Mathf.Clamp(pp.z,-8.8f,8.8f); player.transform.position=pp; shadow.transform.position=pp+Vector3.up*.035f;
+        Vector3 pp=player.transform.position; pp.x=Mathf.Clamp(pp.x,-11.8f,11.8f); pp.z=Mathf.Clamp(pp.z,-8.8f,8.8f); player.transform.position=pp;
         foreach(var e in enemies) UpdateEnemy(e,dt);
         UpdateTruthBlades();
         foreach (var e in enemies)

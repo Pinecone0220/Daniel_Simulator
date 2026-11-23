@@ -50,7 +50,7 @@ for side in ('L','R'):
 for name in merge:
  if name in eb:
   bone=eb[name]
-  for child in list(bone.children): child.use_connect=False; child.parent=bone.parent
+  for child in list(bone.children): child.use_connect=False; child.parent=eb[merge[name]]
   eb.remove(bone)
 bpy.ops.object.mode_set(mode='OBJECT')
 for old,new in mapping.items():
@@ -79,8 +79,9 @@ for m in mesh.data.materials:
   m.node_tree.links.new(n.outputs['Alpha'],p.inputs['Alpha'])
  m.use_backface_culling=False
 arm.name='DaVanya_Rig'; mesh.name='DaVanya_Body'
-# Blender source faces -Y. A half turn places the imported model on the simulator's +Z heading.
+# Export using Unity's axis convention.
 for o in (arm,mesh): o.select_set(True)
 bpy.context.view_layer.objects.active=arm
 bpy.ops.export_scene.fbx(filepath=str(dest/'DaVanya.fbx'),use_selection=True,object_types={'ARMATURE','MESH'},axis_forward='-Z',axis_up='Y',add_leaf_bones=False,bake_anim=False,use_mesh_modifiers=False,path_mode='RELATIVE',use_armature_deform_only=False)
 print('EXPORTED_DAVANYA',len(mesh.data.vertices),len(arm.data.bones))
+
