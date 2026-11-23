@@ -8,18 +8,20 @@ using UnityEngine.Rendering;
 /// </summary>
 public sealed class DanielSkillVfx : MonoBehaviour
 {
-    enum Kind { Scissors, Mark, MarkBurst, Smoke, Trail, Ultimate, Slash, Ghost, Ping, Range, Latch, Stream, Veil, Boom, Link, DaggerCloak, DaggerCut, FireTrail, UltimateWake, TruthBlades, TruthImpact }
+    enum Kind { Scissors, Mark, MarkBurst, Smoke, Trail, Ultimate, UltimateExit, Slash, Ghost, Ping, Range, Latch, Stream, Veil, Boom, Link, DaggerCloak, DaggerCut, FireTrail, UltimateWake, TruthBlades, TruthImpact }
     Kind kind;
     DanielSkillVfx ultimateWake;
-    float age, duration, windup, markProgress, height;
+    float age, duration, windup, markProgress, height, ultimateExitDistance;
     bool markReady, rangeHighlight;
     Transform linkTarget;
     Transform follow, leftBlade, rightBlade, fan, flash, arrow, timer, range;
+    Transform ultimateAura, ultimateAuraBands;
     Vector3 startPoint;
     LineRenderer seam;
     readonly LineRenderer[] markFill = new LineRenderer[8];
     readonly Vector3[] handleArc = new Vector3[17];
     float markOpen;
+    float qHalfAngle;
     Camera markCamera;
     Vector3 exitDirection = Vector3.forward;
     readonly List<Material> ownedMaterials = new List<Material>();
@@ -28,7 +30,7 @@ public sealed class DanielSkillVfx : MonoBehaviour
     readonly List<Transform> rings = new List<Transform>();
     readonly List<Vector3> moteOrigins = new List<Vector3>();
     readonly List<Vector3> moteVelocities = new List<Vector3>();
-    Material dark, purple, bright, soft, cyan, extra, daggerEdge;
+    Material dark, purple, bright, soft, cyan, extra, daggerEdge, ultimateGlow, ultimateEdge;
     Color extraColor;
 
     static readonly Color DaggerWind = new Color(.14f, .85f, 1f, .64f);
@@ -38,6 +40,10 @@ public sealed class DanielSkillVfx : MonoBehaviour
     static readonly Color ShadowColor = new Color(.055f, .015f, .10f, .9f);
     static readonly Color VioletColor = new Color(.59f, .16f, .85f, .85f);
     static readonly Color WhiteColor = new Color(.96f, .70f, 1f, 1f);
+    static readonly Color AuraViolet = new Color(.65f, .24f, 1f, .78f);
+    static readonly Color AuraLight = new Color(.92f, .63f, 1f, .86f);
+    static readonly Color ExitLight = new Color(1f, .86f, 1f, 1f);
+    static readonly Color ExitWave = new Color(.75f, .37f, 1f, .66f);
 
     static DanielSkillVfx New(Kind type, Vector3 point, Vector3 direction, float life)
     {
@@ -55,17 +61,18 @@ public sealed class DanielSkillVfx : MonoBehaviour
         return effect;
     }
 
-    public static DanielSkillVfx SpawnQ(Vector3 center, Vector3 direction, float windup = DanielSimulator.QWindup)
+    internal static DanielSkillVfx SpawnQ(Vector3 center, Vector3 direction, DanielSkillSettings.Scissors settings)
     {
         direction.y = 0;
         if (direction.sqrMagnitude < .001f) direction = Vector3.forward;
         direction.Normalize();
-        const float reach = DanielSimulator.QRadius, halfAngle = DanielSimulator.QHalfAngle, centre = DanielSimulator.QCenterHalfWidth;
-        var fx = New(Kind.Scissors, center - direction * (reach * .5f) + Vector3.up * .13f, direction, windup + .3f);
-        fx.windup = Mathf.Max(.15f, windup);
+        float reach = settings.Reach, halfAngle = settings.HalfAngle;
+        var fx = New(Kind.Scissors, center - direction * (reach * .5f) + Vector3.up * .13f, direction, settings.Windup + .3f);
+        fx.windup = settings.Windup;
+        fx.qHalfAngle = halfAngle;
         fx.fan = fx.MeshPart("Violet swept area", fx.SectorMesh(reach, halfAngle * 2), fx.soft, fx.transform).transform;
-        fx.leftBlade = fx.ScissorHalf("Left scissor", -1);
-        fx.rightBlade = fx.ScissorHalf("Right scissor", 1);
+        fx.leftBlade = fx.ScissorHalf("Left scissor", -1, reach);
+        fx.rightBlade = fx.ScissorHalf("Right scissor", 1, reach);
         fx.flash = fx.Line("Closing seam", new[] {new Vector3(0,.04f,0), new Vector3(0,.04f,reach)}, .075f, fx.bright, fx.transform).transform;
         fx.flash.gameObject.SetActive(false);
         fx.leftBlade.localRotation = Quaternion.Euler(0, -halfAngle, 0);
@@ -83,24 +90,52 @@ public sealed class DanielSkillVfx : MonoBehaviour
         }
         outline[19] = outline[0];
         fx.Line("Outer damage edge", outline, .045f, fx.purple, fx.range);
-        float near = centre / Mathf.Tan(halfAngle * Mathf.Deg2Rad), far = Mathf.Sqrt(reach * reach - centre * centre);
-        var strip = new[] { new Vector3(0, .02f, 0), new Vector3(centre, .02f, near), new Vector3(centre, .02f, far), new Vector3(0, .02f, reach), new Vector3(-centre, .02f, far), new Vector3(-centre, .02f, near) };
-        var stripMesh = new Mesh(); stripMesh.vertices = strip; stripMesh.triangles = new[] { 0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 5 };
-        stripMesh.RecalculateNormals(); stripMesh.RecalculateBounds(); fx.ownedMeshes.Add(stripMesh);
-        fx.extraColor = new Color(1f, .62f, .95f, .42f);
-        fx.extra = fx.MakeMaterial(fx.extraColor);
-        fx.MeshPart("Centre damage area", stripMesh, fx.extra, fx.range);
-        fx.Line("Centre damage edge", new[] { strip[0] + Vector3.up * .01f, strip[1] + Vector3.up * .01f, strip[2] + Vector3.up * .01f, strip[3] + Vector3.up * .01f, strip[4] + Vector3.up * .01f, strip[5] + Vector3.up * .01f, strip[0] + Vector3.up * .01f }, .03f, fx.bright, fx.range);
+        if (settings.CenterWidth > 0f) fx.BuildQCenter(reach, halfAngle, settings.CenterHalfWidth);
         var shard = fx.Octahedron();
         for (int i = 0; i < 10; i++)
         {
-            float z = .5f + i * .31f; int side = i % 2 == 0 ? -1 : 1;
+            float z = reach * Mathf.Lerp(.14f, .94f, i / 9f); int side = i % 2 == 0 ? -1 : 1;
             var mote = fx.MeshPart("Cut shard", shard, i % 3 == 0 ? fx.bright : fx.purple, fx.transform).transform;
             mote.localScale = Vector3.zero;
             fx.motes.Add(mote); fx.moteOrigins.Add(new Vector3(0, .1f, z));
             fx.moteVelocities.Add(new Vector3(side * (1.6f + (i % 3) * .5f), 1.2f + (i % 4) * .35f, .6f));
         }
         return fx;
+    }
+
+    void BuildQCenter(float reach, float halfAngle, float halfWidth)
+    {
+        float angle = halfAngle * Mathf.Deg2Rad;
+        float width = Mathf.Min(halfWidth, reach * Mathf.Sin(angle));
+        float near = width / Mathf.Tan(angle);
+        float arcAngle = Mathf.Asin(width / reach);
+        const int arcSteps = 18;
+        var strip = new List<Vector3> { new Vector3(0f, .02f, 0f), new Vector3(-width, .02f, near) };
+        for (int i = 0; i <= arcSteps; i++)
+        {
+            float a = Mathf.Lerp(-arcAngle, arcAngle, i / (float)arcSteps);
+            strip.Add(new Vector3(Mathf.Sin(a) * reach, .02f, Mathf.Cos(a) * reach));
+        }
+        strip.Add(new Vector3(width, .02f, near));
+        var triangles = new int[(strip.Count - 2) * 3];
+        for (int i = 1; i < strip.Count - 1; i++)
+        {
+            int index = (i - 1) * 3;
+            triangles[index] = 0;
+            triangles[index + 1] = i;
+            triangles[index + 2] = i + 1;
+        }
+        var mesh = new Mesh();
+        mesh.SetVertices(strip);
+        mesh.triangles = triangles;
+        mesh.RecalculateNormals();
+        ownedMeshes.Add(mesh);
+        extraColor = new Color(1f, .62f, .95f, .42f);
+        extra = MakeMaterial(extraColor);
+        MeshPart("Centre damage area", mesh, extra, range);
+        strip.Add(strip[0]);
+        for (int i = 0; i < strip.Count; i++) strip[i] += Vector3.up * .01f;
+        Line("Centre damage edge", strip.ToArray(), .03f, bright, range);
     }
 
     /// <summary>
@@ -346,7 +381,8 @@ public sealed class DanielSkillVfx : MonoBehaviour
     public static DanielSkillVfx BeginUltimate(Transform target)
     {
         if (!target) return null;
-        var fx = New(Kind.Ultimate, target.position + Vector3.up*.1f, Vector3.forward, 2.6f);
+        // The simulator stops the aura when the hold ends, including on an early recast.
+        var fx = New(Kind.Ultimate, target.position + Vector3.up*.12f, Vector3.forward, 0f);
         fx.follow = target;
         fx.ultimateWake = BeginUltimateWake(target);
         fx.fan = fx.MeshPart("Shadow pool", fx.SectorMesh(.85f,360), fx.dark, fx.transform).transform;
@@ -363,12 +399,64 @@ public sealed class DanielSkillVfx : MonoBehaviour
             var mote=fx.MeshPart("Orbiting shadow",fx.Octahedron(),fx.dark,fx.transform).transform;
             mote.localScale=new Vector3(.14f,.3f,.14f); fx.motes.Add(mote);
         }
+        fx.BuildUltimateAura();
+        fx.SampleUltimateAura();
         return fx;
     }
 
-    public void SetExitDirection(Vector3 direction)
+    void BuildUltimateAura()
+    {
+        ultimateAura = new GameObject("Shadow aura").transform;
+        ultimateAura.SetParent(transform, false);
+        ultimateAuraBands = new GameObject("Orbiting bands").transform;
+        ultimateAuraBands.SetParent(ultimateAura, false);
+        ultimateGlow = MakeMaterial(AuraViolet);
+        ultimateEdge = MakeMaterial(AuraLight);
+        ultimateEdge.renderQueue = ultimateGlow.renderQueue + 1;
+        var taper = new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(.42f, 1f), new Keyframe(1f, 0f));
+        for (int band = 0; band < 4; band++)
+        {
+            var points = new Vector3[24];
+            for (int i = 0; i < points.Length; i++)
+            {
+                float t = i / (float)(points.Length - 1);
+                float angle = (band * 107f + t * 158f) * Mathf.Deg2Rad;
+                float radius = Mathf.Lerp(.72f, .49f, t) + .11f * Mathf.Sin(t * Mathf.PI);
+                points[i] = new Vector3(Mathf.Sin(angle) * radius, .08f + band * .30f + t * .74f, Mathf.Cos(angle) * radius);
+            }
+            Line("Violet aura band", points, .13f, ultimateGlow, ultimateAuraBands).widthCurve = taper;
+            Line("Lit aura edge", points, .036f, ultimateEdge, ultimateAuraBands).widthCurve = taper;
+        }
+        var shard = Octahedron();
+        for (int i = 0; i < 12; i++)
+            rings.Add(MeshPart("Rising ember", shard, i % 3 == 0 ? ultimateEdge : ultimateGlow, ultimateAura).transform);
+    }
+
+    void SampleUltimateAura()
+    {
+        float appear = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(age / .16f));
+        float pulse = .86f + .14f * Mathf.Sin(age * 10f);
+        Tint(ultimateGlow, AuraViolet, appear * pulse);
+        Tint(ultimateEdge, AuraLight, appear * pulse);
+        float spread = Mathf.Lerp(.8f, 1.04f, appear) + .05f * Mathf.Sin(age * 7f);
+        ultimateAuraBands.localScale = new Vector3(spread, 1f, spread);
+        ultimateAuraBands.localRotation = Quaternion.Euler(0f, age * 137f, 0f);
+        for (int i = 0; i < rings.Count; i++)
+        {
+            float cycle = Mathf.Repeat(age * (.82f + i % 3 * .14f) + i * .137f, 1f);
+            float angle = i * 2.4f + age * 2.1f + cycle;
+            float radius = .46f + .19f * Mathf.Sin(Mathf.PI * cycle);
+            rings[i].localPosition = new Vector3(Mathf.Sin(angle) * radius, Mathf.Lerp(.08f, 1.97f, cycle), Mathf.Cos(angle) * radius);
+            rings[i].localScale = new Vector3(.041f, .13f, .041f) * (appear * Mathf.Sin(Mathf.PI * cycle));
+            rings[i].localRotation = Quaternion.Euler(15f, angle * Mathf.Rad2Deg, 18f);
+        }
+    }
+
+    public void SetExitDirection(Vector3 direction, float distance)
     {
         direction.y=0; if(direction.sqrMagnitude>.001f) exitDirection=direction.normalized;
+        arrow.gameObject.SetActive(distance > 0f);
+        arrow.localScale = new Vector3(1f, 1f, distance * .5f);
     }
     static DanielSkillVfx BeginUltimateWake(Transform target)
     {
@@ -410,6 +498,7 @@ public sealed class DanielSkillVfx : MonoBehaviour
             ultimateWake.duration = ultimateWake.age + .55f;
             foreach (var trail in ultimateWake.GetComponentsInChildren<TrailRenderer>()) trail.emitting = false;
         }
+        if (kind == Kind.Ultimate) gameObject.SetActive(false);
         Destroy(gameObject);
     }
 
@@ -420,14 +509,71 @@ public sealed class DanielSkillVfx : MonoBehaviour
             effect.Stop();
     }
 
-    public static DanielSkillVfx ExitSlash(Vector3 position, Vector3 direction)
+    public static void ExitSlash(Vector3 position, Vector3 direction, float travelDistance, float travelDuration)
     {
         SmokeBurst(position,direction);
-        var fx=New(Kind.Slash,position+Vector3.up*.75f,direction,.42f);
-        fx.Arc("Exit cut",1.45f,125,.085f,fx.bright,fx.transform);
-        fx.Arc("Violet edge",1.50f,145,.18f,fx.purple,fx.transform);
-        fx.Line("Exit thrust",new[]{new Vector3(0,-.2f,0),new Vector3(0,-.2f,1.65f)},.06f,fx.bright,fx.transform);
-        return fx;
+        var fx = New(Kind.UltimateExit, position, direction, travelDuration + .34f);
+        fx.ultimateExitDistance = travelDistance;
+        fx.windup = travelDuration;
+        fx.fan = new GameObject("Exit crescents").transform;
+        fx.fan.SetParent(fx.transform, false);
+        fx.timer = new GameObject("Exit shockwave").transform;
+        fx.timer.SetParent(fx.transform, false);
+        fx.ultimateEdge = fx.MakeMaterial(ExitLight);
+        fx.ultimateGlow = fx.MakeMaterial(ExitWave);
+        fx.purple.renderQueue = fx.dark.renderQueue + 1;
+        fx.ultimateEdge.renderQueue = fx.purple.renderQueue + 1;
+        fx.Circle("Shockwave edge", Vector3.up * .085f, 1.05f, .085f, fx.ultimateGlow, fx.timer, false);
+
+        var taper = new AnimationCurve(new Keyframe(0f, 0f), new Keyframe(.34f, 1f), new Keyframe(.66f, .72f), new Keyframe(1f, 0f));
+        for (int side = -1; side <= 1; side += 2)
+        {
+            var points = new Vector3[32];
+            for (int i = 0; i < points.Length; i++)
+            {
+                float t = i / (float)(points.Length - 1);
+                float cross = Mathf.Lerp(-1.55f, 1.55f, t) * side;
+                float curve = Mathf.Sin(Mathf.PI * t);
+                points[i] = new Vector3(cross, .77f + cross * side * .29f, Mathf.Lerp(-1.22f, .22f, t) + curve * .66f + side * .24f);
+            }
+            fx.Line("Shadow cut", points, .48f, fx.dark, fx.fan).widthCurve = taper;
+            fx.Line("Violet crescent", points, .29f, fx.purple, fx.fan).widthCurve = taper;
+            fx.Line("White-hot edge", points, .065f, fx.ultimateEdge, fx.fan).widthCurve = taper;
+        }
+        fx.Line("Dash seam", new[] { new Vector3(0f, .07f, -.45f), new Vector3(0f, .14f, travelDistance) }, .24f, fx.purple, fx.transform).widthCurve = taper;
+        fx.Line("Dash flash", new[] { new Vector3(0f, .08f, -.45f), new Vector3(0f, .15f, travelDistance) }, .062f, fx.ultimateEdge, fx.transform).widthCurve = taper;
+
+        var shard = fx.Octahedron();
+        for (int i = 0; i < 20; i++)
+        {
+            float angle = i * 2.4f;
+            var velocity = new Vector3(Mathf.Sin(angle) * (2f + i % 5 * .5f), 1.65f + i % 4 * .54f, 2.65f + Mathf.Cos(angle) * 2.35f);
+            fx.moteOrigins.Add(new Vector3(0f, .7f + i % 3 * .2f, travelDistance * (i % 6) / 7f));
+            fx.moteVelocities.Add(velocity);
+            fx.motes.Add(fx.MeshPart("Falling exit spark", shard, i % 4 == 0 ? fx.bright : fx.purple, fx.transform).transform);
+            fx.motes[i].localRotation = Quaternion.FromToRotation(Vector3.up, velocity);
+        }
+        fx.Sample(0f);
+    }
+
+    float SampleUltimateExit()
+    {
+        float travel = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(age / windup));
+        float tail = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(windup * .4f, duration, age));
+        fan.localPosition = Vector3.forward * (ultimateExitDistance * travel);
+        fan.localScale = Vector3.Lerp(new Vector3(.67f, .75f, .74f), new Vector3(1.12f, 1f, 1.18f), travel);
+        float radius = Mathf.Lerp(.49f, 2.35f, 1f - Mathf.Exp(-age * 9f));
+        timer.localScale = new Vector3(radius, 1f, radius);
+        Tint(ultimateGlow, ExitWave, 1f - Mathf.InverseLerp(0f, .32f, age));
+        Tint(ultimateEdge, ExitLight, Mathf.Exp(-age * 5f) * tail);
+        for (int i = 0; i < motes.Count; i++)
+        {
+            float flight = Mathf.Max(0f, age - i % 6 * .018f);
+            motes[i].localPosition = moteOrigins[i] + moteVelocities[i] * flight + Vector3.down * (5f * flight * flight);
+            float size = Mathf.Clamp01(flight / .025f) * (1f - Mathf.InverseLerp(.12f, .48f, flight));
+            motes[i].localScale = new Vector3(.047f, .17f + i % 4 * .035f, .047f) * size;
+        }
+        return tail;
     }
 
     public static DanielSkillVfx BeginDaggerCloak(Transform owner, float lifetime)
@@ -774,12 +920,14 @@ public sealed class DanielSkillVfx : MonoBehaviour
         if(kind==Kind.Scissors)
         {
             // Snap open with a small overshoot, hold with rising tension, then accelerate shut exactly on the hit.
-            float open=EaseOutBack(Mathf.Clamp01(age/.14f));
-            float shut=Mathf.InverseLerp(windup-.17f,windup,age), closing=shut*shut*shut;
-            float tension=Mathf.SmoothStep(0,1,Mathf.InverseLerp(.14f,windup-.17f,age))*4f;
+            float openDuration = Mathf.Min(.14f, windup * .48f);
+            float closeStart = windup - Mathf.Min(.17f, windup * .48f);
+            float open=EaseOutBack(Mathf.Clamp01(age/openDuration));
+            float shut=Mathf.InverseLerp(closeStart,windup,age), closing=shut*shut*shut;
+            float tension=Mathf.SmoothStep(0,1,Mathf.InverseLerp(openDuration,closeStart,age))*4f;
             float past=Mathf.Max(0,age-windup);
             float recoil=age>=windup?-5f*Mathf.Exp(-past*18)*Mathf.Cos(past*40):0;
-            float angle=(DanielSimulator.QHalfAngle*open+tension)*(1-closing)+recoil;
+            float angle=(qHalfAngle*open+tension)*(1-closing)+recoil;
             leftBlade.localRotation=Quaternion.Euler(0,-angle,0);
             rightBlade.localRotation=Quaternion.Euler(0,angle,0);
             float grow=1-Mathf.Pow(1-Mathf.Clamp01(age/.12f),3);
@@ -787,7 +935,7 @@ public sealed class DanielSkillVfx : MonoBehaviour
             leftBlade.localScale=rightBlade.localScale=Vector3.one*pop;
             flash.gameObject.SetActive(age>=windup);
             if(age>=windup) { if(!seam) seam=flash.GetComponent<LineRenderer>(); if(seam) seam.widthMultiplier=Mathf.Lerp(.24f,.03f,Mathf.Clamp01(past/.22f)); }
-            fan.localScale=new Vector3(Mathf.Max(.03f,angle/DanielSimulator.QHalfAngle),1,1);
+            fan.localScale=new Vector3(Mathf.Max(.03f,angle/qHalfAngle),1,1);
             float gone=Mathf.Clamp01(past/.3f);
             fade=age<windup?Mathf.SmoothStep(0,1,age/.07f):(1-gone)*(1-gone);
             float after=age-windup;
@@ -958,7 +1106,7 @@ public sealed class DanielSkillVfx : MonoBehaviour
             transform.position = follow.position;
         if(kind==Kind.Ultimate)
         {
-            if(!follow) { Destroy(gameObject); return; }
+            if(!follow) { Stop(); return; }
             transform.position=follow.position+Vector3.up*.12f;
             arrow.rotation=Quaternion.LookRotation(exitDirection);
             float pulse=1+Mathf.Sin(age*Mathf.PI*4)*.12f;
@@ -970,8 +1118,10 @@ public sealed class DanielSkillVfx : MonoBehaviour
                 motes[i].localPosition=new Vector3(Mathf.Sin(a)*.67f,.16f+Mathf.Sin(a*2)*.13f,Mathf.Cos(a)*.67f);
                 motes[i].localRotation=Quaternion.Euler(20,a*Mathf.Rad2Deg,35);
             }
+            SampleUltimateAura();
             fade=1;
         }
+        if (kind == Kind.UltimateExit) fade = SampleUltimateExit();
         if(kind==Kind.Latch)
         {
             if(!follow) { Destroy(gameObject); return; }
@@ -1145,13 +1295,13 @@ public sealed class DanielSkillVfx : MonoBehaviour
         var points=new Vector3[25]; for(int i=0;i<points.Length;i++) {float a=Mathf.Lerp(-angle*.5f,angle*.5f,i/(float)(points.Length-1))*Mathf.Deg2Rad;points[i]=new Vector3(Mathf.Sin(a)*radius,Mathf.Sin(a)*.13f,Mathf.Cos(a)*radius);}
         Line(name,points,width,material,parent);
     }
-    Transform ScissorHalf(string name,int side)
+    Transform ScissorHalf(string name,int side,float reach)
     {
         var pivot=new GameObject(name).transform; pivot.SetParent(transform,false);
-        var mesh=new Mesh(); mesh.vertices=new[]{new Vector3(-.10f,0,-.10f),new Vector3(.15f,0,.25f),new Vector3(0,0,DanielSimulator.QRadius),new Vector3(-.24f,0,.55f)};
+        var mesh=new Mesh(); mesh.vertices=new[]{new Vector3(-.10f,0,-.10f),new Vector3(.15f,0,.25f),new Vector3(0,0,reach),new Vector3(-.24f,0,.55f)};
         mesh.triangles=new[]{0,2,1,0,3,2}; mesh.RecalculateNormals(); ownedMeshes.Add(mesh);
         MeshPart("Blade",mesh,dark,pivot);
-        Line("Blade edge",new[]{new Vector3(.15f,.025f,.25f),new Vector3(0,.025f,DanielSimulator.QRadius)},.035f,purple,pivot);
+        Line("Blade edge",new[]{new Vector3(.15f,.025f,.25f),new Vector3(0,.025f,reach)},.035f,purple,pivot);
         Circle("Finger loop",new Vector3(side*.17f,0,-.48f),.27f,.10f,dark,pivot,false);
         Line("Handle neck",new[]{new Vector3(side*.15f,0,-.32f),Vector3.zero},.10f,dark,pivot);
         return pivot;

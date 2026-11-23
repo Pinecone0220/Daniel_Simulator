@@ -102,8 +102,7 @@ public sealed class DanielCharacterAnimation : MonoBehaviour
     public void PlayUltimateEnter() { Play("Enter", .2f); }
     /// <summary>R folds into the shadow on the same frame the simulator hides the model.</summary>
     public void PlayUltimateLatch(float windupDuration) => Play("Latch", windupDuration);
-    public const float UltimateExitDuration = .3f;
-    public void PlayUltimateExit() { SetHidden(false); Play("Exit", UltimateExitDuration); }
+    public void PlayUltimateExit(float duration = .3f) { SetHidden(false); Play("Exit", duration); }
     public void CancelUltimateExit() { if (action == "Exit") Play("Idle", 0); }
 
     MaterialPropertyBlock untargetableTint;
