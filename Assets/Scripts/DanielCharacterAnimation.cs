@@ -21,9 +21,10 @@ public sealed class DanielCharacterAnimation : MonoBehaviour
     Material[][] normalMaterials, ghostMaterials;
     readonly List<Material> ownedMaterials = new List<Material>();
     readonly List<Mesh> ownedMeshes = new List<Mesh>();
-    float speed, gait, age, actionDuration, stealthAge, unit = 1, moveBlend, cadence = RunCadence;
+    float speed, gait, idleTime, age, actionDuration, stealthAge, unit = 1, moveBlend, cadence = RunCadence;
+    float strideSpeed = RunSpeed;
     // Forward run loop from the 6-pose sheet: one full cycle (two steps) every 0.73 s at full speed.
-    const float RunPeriod = .73f, RunCadence = 2 * Mathf.PI / RunPeriod, RunSpeed = 4.4f, StanceShare = .315f;
+    const float RunPeriod = .73f, RunCadence = 2 * Mathf.PI / RunPeriod, RunSpeed = 4.4f, StanceShare = .39f;
     string action = "Idle";
     bool initialized, stealth;
     GameObject weapon;
@@ -88,15 +89,19 @@ public sealed class DanielCharacterAnimation : MonoBehaviour
     public void SetMoving(bool moving) { SetMoving(moving ? 4.4f : 0); }
     void Play(string name, float duration) { action = name; age = 0; actionDuration = duration; }
     void Play(string name) { Play(name, Clips[name].duration); }
-    public void PlayDash() { Play("Dash"); }
+    public void PlayDash(float travelDuration) => Play("Dash", travelDuration);
+    public void LandDash()
+    {
+        if (action == "Dash") Play("DashLand");
+    }
     public void PlayAttack(bool empowered = false, float speedMultiplier = 1f)
     {
         float duration = empowered ? Clips["Empowered"].duration : .38f;
         Play(empowered ? "Empowered" : "Attack", duration / speedMultiplier);
     }
     public void PlayUltimateEnter() { Play("Enter", .2f); }
-    /// <summary>R pre-delay: gather in, then sink toward the ground. The simulator hides the model at 0.5s.</summary>
-    public void PlayUltimateLatch() { Play("Latch"); }
+    /// <summary>R folds into the shadow on the same frame the simulator hides the model.</summary>
+    public void PlayUltimateLatch(float windupDuration) => Play("Latch", windupDuration);
     public const float UltimateExitDuration = .3f;
     public void PlayUltimateExit() { SetHidden(false); Play("Exit", UltimateExitDuration); }
     public void CancelUltimateExit() { if (action == "Exit") Play("Idle", 0); }
@@ -147,10 +152,16 @@ public sealed class DanielCharacterAnimation : MonoBehaviour
         Initialize();
         float dt = Mathf.Max(0, deltaTime);
         bool moving = speed > .05f;
-        if (moving) cadence = RunCadence * Mathf.Clamp(speed / RunSpeed, .6f, 1.5f);
+        if (moving)
+        {
+            strideSpeed = speed;
+            cadence = RunCadence * Mathf.Clamp(speed / RunSpeed, .6f, 1.5f);
+        }
+        idleTime += dt;
         int previousContact = Mathf.FloorToInt(gait / Mathf.PI);
         gait += dt * (moving || moveBlend > .01f ? cadence : 1.6f);
-        moveBlend = Mathf.MoveTowards(moveBlend, moving ? 1 : 0, dt * 7);
+        float targetBlend = moving && action != "Dash" && action != "Latch" ? 1 : 0;
+        moveBlend = Mathf.MoveTowards(moveBlend, targetBlend, dt * (targetBlend > moveBlend ? 6f : 8f));
         age += dt;
         if (stealth)
         {
@@ -161,10 +172,12 @@ public sealed class DanielCharacterAnimation : MonoBehaviour
             foreach (var set in ghostMaterials) foreach (var material in set) if (material) material.SetColor("_BaseColor", tint);
         }
         if (action == "Enter" && age >= .12f) SetHidden(true);
-        if (age >= actionDuration) action = "Idle";
+        if (age >= actionDuration && action != "Dash" && action != "Latch") action = "Idle";
         Evaluate(action, actionDuration > 0 ? age / actionDuration : 0, gait);
         int contact = Mathf.FloorToInt(gait / Mathf.PI);
-        if (moving && moveBlend >= .5f && contact != previousContact)
+        bool inFootstepPose = action != "Dash" && action != "Latch" &&
+            (action != "DashLand" || age >= actionDuration * .75f);
+        if (moving && inFootstepPose && moveBlend >= .5f && contact != previousContact)
             Footstep?.Invoke((contact & 1) == 0);
     }
     /// <summary>Deterministic sampling for render QA or an offline animation baker.</summary>
@@ -172,16 +185,25 @@ public sealed class DanielCharacterAnimation : MonoBehaviour
     {
         Initialize();
         float previous = speed, previousBlend = moveBlend, previousCadence = cadence;
+        float previousIdle = idleTime, previousStrideSpeed = strideSpeed;
         speed = state == "Walk" ? RunSpeed : 0; moveBlend = state == "Walk" ? 1 : 0; cadence = RunCadence;
+        idleTime = normalizedTime * 3.4f;
+        strideSpeed = RunSpeed;
         Evaluate(state == "Walk" ? "Idle" : state, Mathf.Clamp01(normalizedTime), normalizedTime * Mathf.PI * 2);
         speed = previous; moveBlend = previousBlend; cadence = previousCadence;
+        idleTime = previousIdle; strideSpeed = previousStrideSpeed;
     }
     void Evaluate(string state, float time, float phase)
     {
         foreach (var pose in rest) { pose.bone.localPosition = pose.position; pose.bone.localRotation = pose.rotation; }
         if (!HasValidRig) return;
         float walk = moveBlend;
-        float stride = Mathf.Sin(phase), breath = Mathf.Sin(phase * .6f);
+        if (state == "Dash" || state == "Latch")
+            walk *= 1 - Mathf.SmoothStep(0, 1, Mathf.InverseLerp(0, .25f, time));
+        if (state == "DashLand") walk *= Mathf.SmoothStep(0, 1, Mathf.InverseLerp(.5f, 1, time));
+        float stride = Mathf.Sin(phase);
+        float breath = Mathf.Sin(idleTime * 2 * Mathf.PI / 3.4f);
+        float idleWeight = 1 - walk;
         // cycle 0 = left foot contact (sheet 01), .5 = right foot contact (sheet 04).
         float cycle = Mathf.Repeat(phase / (2 * Mathf.PI), 1), armSwing = -Mathf.Cos(cycle * 2 * Mathf.PI);
         // Locomotion silhouette: every skill clip starts from and returns to this pose.
@@ -189,7 +211,10 @@ public sealed class DanielCharacterAnimation : MonoBehaviour
         // left elbow folded and pumping a short arc opposite the left leg.
         Pose p = new Pose
         {
-            lean = Mathf.Lerp(5, 30, walk), twist = 5 * Mathf.Cos(cycle * 2 * Mathf.PI) * walk,
+            lean = Mathf.Lerp(5 + breath * 1.3f, 27, walk),
+            twist = 4 * Mathf.Cos(cycle * 2 * Mathf.PI) * walk + breath * 1.5f * idleWeight,
+            roll = breath * .9f * idleWeight,
+            root = V(breath * .012f, -.018f, 0),
             lU = Vector3.Lerp(IdleLU, new Vector3(-.22f, -.85f, -.2f + .22f * armSwing), walk),
             lL = Vector3.Lerp(IdleLL, new Vector3(.25f, -.3f + .1f * armSwing, .9f), walk),
             rU = Vector3.Lerp(IdleRU, new Vector3(.2f, -.9f, -.28f - .05f * armSwing), walk),
@@ -220,7 +245,7 @@ public sealed class DanielCharacterAnimation : MonoBehaviour
         float planted = 1 - walk;
         Vector3 root = new Vector3(p.root.x * planted, p.root.y * (1 - walk * .6f), p.root.z * planted) * unit;
         // Hips sink onto each contact and rise through the push-off.
-        root.y += .009f * breath * (1 - walk) - (.04f + .03f * Mathf.Cos(cycle * 4 * Mathf.PI)) * unit * walk;
+        root.y += (.012f * breath * idleWeight - (.027f + .022f * Mathf.Cos(cycle * 4 * Mathf.PI)) * walk) * unit;
         // The run carries the whole trunk forward from the hips, matching the sheet's waist angle.
         float toePitch = p.pitch * planted, pitch = toePitch + 16 * walk;
         hips.position += transform.TransformVector(root);
@@ -251,7 +276,7 @@ public sealed class DanielCharacterAnimation : MonoBehaviour
     void GaitFoot(float u, out Vector3 offset, out float toePitch)
     {
         float period = 2 * Mathf.PI / Mathf.Max(.01f, cadence);
-        float reach = speed * StanceShare * period * .5f / Mathf.Max(.0001f, transform.lossyScale.z);
+        float reach = strideSpeed * StanceShare * period * .5f / Mathf.Max(.0001f, transform.lossyScale.z);
         reach = Mathf.Min(reach > 0 ? reach : .42f * unit, .46f * unit);
         if (u < StanceShare)
         {
@@ -264,8 +289,8 @@ public sealed class DanielCharacterAnimation : MonoBehaviour
         {
             float v = (u - StanceShare) / (1 - StanceShare);
             float carry = Mathf.SmoothStep(0, 1, Mathf.InverseLerp(.15f, 1, v));
-            offset = new Vector3(0, .36f * unit * Mathf.Sin(Mathf.PI * Mathf.Pow(v, .7f)), Mathf.Lerp(-reach, reach, carry));
-            toePitch = v < .25f ? Mathf.Lerp(28, 65, v / .25f) : Mathf.Lerp(65, -12, Mathf.InverseLerp(.25f, 1, v));
+            offset = new Vector3(0, .235f * unit * Mathf.Sin(Mathf.PI * Mathf.Pow(v, .8f)), Mathf.Lerp(-reach, reach, carry));
+            toePitch = v < .25f ? Mathf.Lerp(28, 44, v / .25f) : Mathf.Lerp(44, -12, Mathf.InverseLerp(.25f, 1, v));
         }
     }
 
@@ -315,20 +340,23 @@ public sealed class DanielCharacterAnimation : MonoBehaviour
     // Wide-stance "ready" silhouette shared by frame 01/12 of every sheet.
     static readonly Vector3 HangLU = V(-.35f, -.9f, .1f), HangLL = V(-.15f, -.95f, .25f), HangRU = V(.35f, -.9f, .1f), HangRL = V(.15f, -.95f, .25f);
     static readonly Vector3 WideL = V(-.08f, 0, 0), WideR = V(.08f, 0, 0);
+    static Key DashContact(float time) => K(time, 34, -9, -5, 15,
+        V(-.025f, -.16f, .075f), V(-.42f, -.72f, .4f), V(.08f, -.52f, .85f),
+        V(.24f, -.68f, -.65f), V(.1f, -.48f, .86f), V(-.025f, 0, .31f), V(.045f, 0, -.24f));
     static readonly Dictionary<string, Clip> Clips = new Dictionary<string, Clip>
     {
         // Q and W have no cast animation: the character keeps its current idle/walk pose.
-        // E sheet, played slowly enough to read. 02-04 tuck, 05-07 flat dive across the 0.28 s dash,
-        // 08 squat landing, 11-12 rise. Keep DashTravel in the simulator in step with the dive keys.
+        // Travel ends on contact. The simulator starts the absorption and recovery at that point.
         { "Dash", Make(
             Base(0),
-            K(.06f, 45, 0, 0, 10, V(0, -.35f, 0), V(-.3f, -.6f, .5f), V(.3f, -.3f, .7f), V(.3f, -.6f, .5f), V(-.3f, -.3f, .7f), WideL, WideR),     // E04
-            K(.13f, 30, 0, 0, 50, V(0, -.4f, .1f), V(-.3f, -.05f, -.9f), V(-.15f, .1f, -.95f), V(.3f, -.05f, -.9f), V(.15f, .1f, -.95f), V(0, .05f, -.25f), V(0, .4f, -.8f)), // E05
-            K(.27f, 30, 0, 0, 60, V(0, -.45f, .15f), V(-.25f, 0, -.95f), V(-.12f, .12f, -.95f), V(.25f, 0, -.95f), V(.12f, .12f, -.95f), V(0, 0, -.1f), V(0, .45f, -.85f)), // E06-07
-            K(.44f, 40, 0, 0, 0, V(0, -.5f, 0), V(-.35f, -.7f, .5f), V(.1f, -.9f, .3f), V(.35f, -.7f, .5f), V(-.1f, -.9f, .3f), WideL, WideR),     // E08
-            K(.58f, 38, 0, 0, 0, V(0, -.46f, 0), V(-.35f, -.72f, .48f), V(.08f, -.9f, .3f), V(.35f, -.72f, .48f), V(-.08f, -.9f, .3f), WideL, WideR), // E08 settle
-            K(.80f, 22, 0, 0, 0, V(0, -.2f, 0), HangLU, HangLL, HangRU, HangRL, WideL, WideR),                                                    // E11
-            Base(1.05f)) },
+            K(.08f, 31, -12, -3, 24, V(0, -.15f, .09f), V(-.3f, -.55f, .7f), V(.08f, -.32f, .94f), V(.25f, -.4f, -.85f), V(.12f, -.25f, .96f), V(0, .05f, .13f), V(.025f, .12f, -.27f)),
+            K(.17f, 33, -7, -3, 32, V(0, -.18f, .13f), V(-.35f, -.65f, .48f), V(.08f, -.40f, .90f), V(.24f, -.25f, -.94f), V(.1f, -.18f, .98f), V(0, .12f, .23f), V(.04f, .23f, -.34f)),
+            DashContact(.28f)) },
+        { "DashLand", Make(
+            DashContact(0),
+            K(.085f, 27, -8, -4, 10, V(-.035f, -.23f, .10f), V(-.33f, -.72f, .49f), V(.10f, -.58f, .80f), V(.22f, -.88f, -.23f), V(.02f, -.35f, .94f), V(-.025f, 0, .31f), V(.045f, 0, -.24f)),
+            K(.21f, 14, -4, -2, 4, V(-.015f, -.08f, .08f), IdleLU, IdleLL, IdleRU, IdleRL, V(-.025f, 0, .25f), V(.035f, .07f, -.08f)),
+            Base(.36f)) },
         // E sheet 08-12: the empowered attack reappears crouched beside the target and cuts sideways.
         { "Empowered", Make(
             K(0, 40, -30, 0, 0, V(0, -.5f, 0), V(-.35f, -.7f, .5f), V(.1f, -.9f, .3f), V(-.6f, -.2f, .6f), V(-.8f, .1f, .3f), WideL, WideR),       // E08
@@ -336,15 +364,13 @@ public sealed class DanielCharacterAnimation : MonoBehaviour
             K(.38f, 35, 42, 0, 0, V(0, -.45f, .1f), V(-.4f, -.7f, -.1f), V(.2f, -.7f, .5f), V(.8f, -.3f, .1f), V(.9f, -.3f, -.2f), V(-.1f, 0, .25f), V(.35f, 0, -.25f)), // E10
             K(.60f, 20, 10, 0, 0, V(0, -.2f, 0), HangLU, HangLL, HangRU, HangRL, V(-.1f, 0, .1f), V(.15f, 0, -.1f)),                              // E11
             Base(.85f)) },
-        // R sheet 02-08: coil, cut, throw the arms open, then fold into a ball. The simulator hides the model at 0.5 s.
+        // Coil into a short forward pull, then tuck into the shadow at the end of the windup.
         { "Latch", Make(
             Base(0),
-            K(.07f, 15, -45, -8, 0, V(0, -.08f, 0), V(-.5f, -.6f, .5f), V(-.4f, -.7f, .5f), V(.2f, .8f, -.4f), V(-.6f, .6f, -.1f), WideL, WideR),  // R02
-            K(.16f, 40, 35, 0, 0, V(0, -.3f, .15f), V(-.6f, .2f, -.6f), V(-.7f, .3f, -.5f), V(-.3f, -.4f, .8f), V(-.6f, -.2f, .7f), V(0, 0, .3f), V(.1f, .1f, -.4f)), // R03
-            K(.30f, -15, 0, 0, 0, V(0, -.05f, 0), V(-.9f, -.15f, .1f), V(-.95f, -.1f, .2f), V(.9f, -.15f, .1f), V(.95f, -.1f, .2f), V(-.15f, 0, 0), V(.15f, 0, 0)), // R06
-            K(.40f, 35, 0, 0, 0, V(0, -.3f, 0), V(-.4f, -.3f, .7f), V(.2f, .9f, .1f), V(.4f, -.3f, .7f), V(-.2f, .9f, .1f), V(-.05f, 0, 0), V(.05f, 0, 0)), // R07
-            K(.50f, 60, 0, 0, 0, V(0, -.6f, 0), V(-.3f, -.6f, .6f), V(.5f, -.2f, .6f), V(.3f, -.6f, .6f), V(-.5f, -.2f, .6f), O, O),              // R08
-            K(.70f, 60, 0, 0, 0, V(0, -.6f, 0), V(-.3f, -.6f, .6f), V(.5f, -.2f, .6f), V(.3f, -.6f, .6f), V(-.5f, -.2f, .6f), O, O)) },
+            K(.11f, 14, -24, -5, 5, V(.025f, -.07f, -.035f), V(-.35f, -.64f, .59f), V(.15f, -.35f, .94f), V(.48f, -.47f, -.74f), V(.08f, .38f, .92f), WideL, WideR),
+            K(.24f, 29, 15, 3, 14, V(0, -.12f, .09f), V(-.53f, -.52f, -.55f), V(-.16f, -.50f, .84f), V(.15f, -.44f, .90f), V(-.26f, -.19f, .94f), V(-.045f, 0, .13f), WideR),
+            K(.37f, 36, 8, 2, 15, V(0, -.23f, .09f), V(-.27f, -.57f, .73f), V(.32f, -.26f, .91f), V(.27f, -.61f, .73f), V(-.38f, -.20f, .90f), V(-.045f, 0, .13f), WideR),
+            K(.50f, 48, 2, 0, 16, V(0, -.36f, .12f), V(-.22f, -.74f, .64f), V(.42f, -.12f, .90f), V(.23f, -.75f, .63f), V(-.40f, -.13f, .90f), V(-.045f, 0, .13f), WideR)) },
         // R sheet 09-12: burst out low, cut sideways, sink into the wide finishing cut, then stand.
         { "Exit", Make(
             K(0, 25, -30, 0, 0, V(0, -.35f, 0), V(-.4f, -.7f, .3f), V(-.1f, -.6f, .7f), V(-.5f, .2f, .7f), V(-.8f, .3f, .3f), V(-.15f, 0, .05f), V(.15f, 0, -.05f)), // R09

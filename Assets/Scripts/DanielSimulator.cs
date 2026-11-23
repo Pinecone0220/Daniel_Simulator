@@ -626,7 +626,20 @@ public class DanielSimulator : MonoBehaviour
         }
         invulnerable=Mathf.Max(0,invulnerable-dt); qBuffTime=Mathf.Max(0,qBuffTime-dt); if(qBuffTime<=0) qBuffAttacks=0;
         if(qDelay>0) { qDelay-=dt; if(qDelay<=0) ResolveQ(); }
-        if(dashTime>0) { afterimageTimer-=dt; if(afterimageTimer<=0 && characterAnimation) { DanielSkillVfx.Afterimage(characterAnimation.transform,.3f); afterimageTimer=.045f; } dashTime=Mathf.Max(0,dashTime-dt); { float dashK=1-dashTime/DashTravel; player.transform.position=Vector3.Lerp(dashFrom,dashTo,1-(1-dashK)*(1-dashK)); } destination=player.transform.position; }
+        if (dashTime > 0)
+        {
+            afterimageTimer -= dt;
+            if (afterimageTimer <= 0 && characterAnimation)
+            {
+                DanielSkillVfx.Afterimage(characterAnimation.transform, .3f);
+                afterimageTimer = .045f;
+            }
+            dashTime = Mathf.Max(0, dashTime - dt);
+            float progress = 1f - dashTime / DashTravel;
+            player.transform.position = Vector3.Lerp(dashFrom, dashTo, 1f - (1f - progress) * (1f - progress));
+            destination = player.transform.position;
+            if (dashTime <= 0 && characterAnimation) characterAnimation.LandDash();
+        }
         daggerWindow = Mathf.Max(0, daggerWindow - dt);
         daggerCooldown = Mathf.Max(0, daggerCooldown - dt);
         tacticalCooldown = Mathf.Max(0f, tacticalCooldown - dt);
@@ -1125,7 +1138,7 @@ public class DanielSimulator : MonoBehaviour
             CancelUltimateExit();
             player.transform.rotation=Quaternion.LookRotation(aim);
             attackTarget=null; dashFrom=player.transform.position; dashTo=dashFrom+aim*ShadowDistance; dashTo.x=Mathf.Clamp(dashTo.x,-11.8f,11.8f); dashTo.z=Mathf.Clamp(dashTo.z,-8.8f,8.8f);
-            if(characterAnimation) characterAnimation.PlayDash(); castFacingTime=DashTravel+.1f;
+            if(characterAnimation) characterAnimation.PlayDash(DashTravel); castFacingTime=DashTravel+.1f;
             DanielSkillVfx.SmokeBurst(dashFrom,aim); DanielSkillVfx.DashTrail(dashFrom,dashTo); DanielSkillVfx.SonicBoom(dashFrom,dashTo,DashTravel);
             skillAudio.Play(DanielSkillAudio.Cue.E_Dash);
             shadowStrikeDamage = ShadowStrikeDamage;
@@ -1139,7 +1152,7 @@ public class DanielSimulator : MonoBehaviour
         ultimateTickDamage = UltimateTickDamage;
         ultimateExitDamage = UltimateExitDamage;
         activeUltimateCooldown = RCooldown[rLevel - 1]; attackTarget=null; stealth=0; ultimateTarget=targetR; ultimateWindup=UltimateWindupDuration; latchFrom=player.transform.position;
-        if(characterAnimation) characterAnimation.PlayUltimateLatch();
+        if(characterAnimation) characterAnimation.PlayUltimateLatch(UltimateWindupDuration);
         DanielSkillVfx.Latch(player.transform,UltimateWindupDuration);
         skillAudio.PlayUltimate();
         StartAdrianaReactions();
