@@ -58,9 +58,10 @@ public class DanielSimulator : MonoBehaviour
     DanielSkillSettings.Scissors castQ;
     DanielSkillSettings.ShadowDash castE;
     float ultimateExitDuration;
-    [SerializeField, Range(1, 5)] int startingQLevel = 1;
-    [SerializeField, Range(1, 5)] int startingWLevel = 1, startingELevel = 1;
-    [SerializeField, Range(1, 3)] int startingRLevel = 1;
+    [SerializeField, Range(1, 5), Tooltip("메뉴와 퍼즐 모드에서 시작할 때 적용하는 Q 스킬 레벨입니다.")] int startingQLevel = 1;
+    [SerializeField, Range(1, 5), Tooltip("메뉴와 퍼즐 모드에서 시작할 때 적용하는 W 스킬 레벨입니다.")] int startingWLevel = 1;
+    [SerializeField, Range(1, 5), Tooltip("메뉴와 퍼즐 모드에서 시작할 때 적용하는 E 스킬 레벨입니다.")] int startingELevel = 1;
+    [SerializeField, Range(1, 3), Tooltip("메뉴와 퍼즐 모드에서 시작할 때 적용하는 R 스킬 레벨입니다.")] int startingRLevel = 1;
     int qLevel, wLevel, eLevel, rLevel, qCastLevel;
     float qCastAttackPower, qAttackSpeedBonus;
     float attackPower => 32f + 4.7f * (danielLevel - 1);
